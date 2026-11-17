@@ -356,7 +356,7 @@ tr.hion td{background:color-mix(in srgb,#ffc440 18%,transparent)}
             <code>_</code><span>Liaison multiple sur un même point : <code>526 1.2_2.1</code> ferme le string 1 et débute le string 2 ; <code>181 1_186 1.1</code> continue le 181 et débute le 186 (double Pcode). Autant de liaisons que voulu.</span>
           </div>
           <p class="note">Format lu&nbsp;: <code>Matricule,Est,Nord,Élév,Description</code> où la description est <code>Pcode String.Contrôle [attributs]</code>, ex. <code>526 1.1</code>. Le fichier _modif est toujours écrit au format <code>P,N,E,Z,D</code> (Point, Nord, Est, Élév., Description), sans ligne d'en-tête, quel que soit le format lu. Il contient les descriptions corrigées, les coordonnées des points inversés et les points calculés (rectangle), insérés juste après le dernier point de leur ligne.</p>
-          <p class="note">Version v9.7-2026-11-03 · fonctionne hors ligne une fois ouverte · les fichiers restent sur l'appareil.</p>
+          <p class="note">Version v9.7.1-2026-11-17 · fonctionne hors ligne une fois ouverte · les fichiers restent sur l'appareil.</p>
           <div class="actions"><button class="btn sm" id="bJournal" type="button" disabled>Exporter le journal des corrections (.csv)</button><button class="btn sm" id="bResetLay" type="button">Rétablir les couches du gabarit</button></div>
         </div>
       </div>
@@ -697,10 +697,18 @@ function prepControl(rows){
   const num=rows.filter(r=>/^\d+$/.test(r.name));if(!num.length)return [];
   let max=0,w=0;for(const r of num){const v=+r.name;if(v>max){max=v;w=r.name.length}}
   const lower=new Set(rows.map(r=>r.name.toLowerCase()));const out=[];
+  // Emlid : origine « Local » = coordonnées connues saisies (points de calibration / contrôle), pas des mesures
+  const isLocal=r=>r.meta&&/^local$/i.test(String(r.meta['Origin']||r.meta['origin']||'').trim());
+  const known=new Map();for(const r of rows)if(!r.bad&&isLocal(r)&&!/[_-]?stkd$/i.test(r.name)){r.ctl='ref';r.mon=r.name;r.noZ=Math.abs(r.z)<1e-9;known.set(r.name.toLowerCase(),r)}
+  // mesures sur ces points connus (calibration de site) : no du monument dans la Description, sinon dans « Code description »
+  if(known.size)for(const r of rows){if(r.bad||r.ctl||!/^\d+$/.test(r.name))continue;const m=r.meta||{};
+    const toks=s=>String(s||'').split(/[\s,;]+/).map(x=>x.toLowerCase()).filter(Boolean);
+    const hit=toks(m['Description']).find(x=>known.has(x))||toks(m['Code description']).find(x=>known.has(x));
+    if(hit){r.ctl='cal';r.mon=known.get(hit).name}}
   const alpha=rows.filter(r=>r.name&&!/^\d+$/.test(r.name)&&!r.bad).length;
   const many=alpha>Math.max(20,rows.length*0.3); // ex. export DWG / Revit « Pt_360 », « IPt_1284 » : noms de logiciel, pas des monuments
   for(const r of rows){
-    if(!r.name||/^\d+$/.test(r.name)||r.bad)continue;
+    if(!r.name||/^\d+$/.test(r.name)||r.bad||r.ctl==='ref')continue;
     if(many&&!/stkd$/i.test(r.name)){const old=r.name;r.fieldName=old;r.name=String(++max).padStart(w,'0');
       out.push({name:r.name,old,before:r.desc,after:r.desc,keep:true});continue}
     const st=/^(.*?)[_-]?stkd$/i.exec(r.name);
@@ -1896,10 +1904,10 @@ function zPanelBind(r){
     S.journal.push({name:r.name,before:st.xyz[2],after:r.xyz[2],why:`Élévation du point calculé : ${why}`,t:new Date().toLocaleString('fr-CA')});
     run();toast(`Élévation de ${r.name} : ${r.xyz[2]} (${why})`)};
 }
-function ctlRef(r){const m=(r.mon||'').toLowerCase();return S.rows.find(x=>x.ctl==='ref'&&(x.mon||'').toLowerCase()===m)}
+function ctlRef(r){const m=(r.mon||'').toLowerCase();return S.rows.find(x=>x.ctl==='ref'&&(x.mon||'').toLowerCase()===m)||S.rows.find(x=>x!==r&&!x.ctl&&!x.bad&&!x.del&&(x.fieldName||x.name).toLowerCase()===m)}
 function ctlDelta(r){if(r.ctl==='ref'){const ms=S.rows.filter(x=>x.ctl&&x.ctl!=='ref'&&(x.mon||'').toLowerCase()===(r.mon||'').toLowerCase());
     return ms.map(x=>{const dE=x.e-r.e,dN=x.n-r.n,dZ=x.z-r.z;return `<br>Mesuré ${esc(x.name)} : ΔE ${dE.toFixed(3)} · ΔN ${dN.toFixed(3)} · ΔH ${Math.hypot(dE,dN).toFixed(3)} · ΔZ ${dZ.toFixed(3)}`}).join('')}
-  const R=ctlRef(r);if(!R)return '';const dE=r.e-R.e,dN=r.n-R.n,dZ=r.z-R.z;return `<br>Écart avec la référence : ΔE ${dE.toFixed(3)} · ΔN ${dN.toFixed(3)} · ΔH ${Math.hypot(dE,dN).toFixed(3)} · ΔZ ${dZ.toFixed(3)}`}
+  const R=ctlRef(r);if(!R)return '';const dE=r.e-R.e,dN=r.n-R.n,dZ=r.z-R.z;return `<br>Écart avec la référence${r.ctl==='cal'?' (calibration)':''} : ΔE ${dE.toFixed(3)} · ΔN ${dN.toFixed(3)} · ΔH ${Math.hypot(dE,dN).toFixed(3)} · ΔZ ${R.noZ?'— (pas d\'élévation connue)':dZ.toFixed(3)}`}
 /* Rétablir un point : description, coordonnées et hauteur d'antenne du terrain (le matricule reste, voir NUMÉROTER / Annuler) */
 function setDel(r,v){if(!!r.del===v)return;S.hist.push({type:'del',r,before:!!r.del});r.del=v;
   S.journal.push({name:r.name,before:v?r.desc:'',after:v?'':r.desc,why:v?'Point effacé : exclu de l\'exportation (rétablissable)':'Point effacé rétabli',t:new Date().toLocaleString('fr-CA')});
@@ -2753,7 +2761,11 @@ function reportHTML(){
   const ant=uniq(meas.map(r=>{const h=hiOf(r);return h==null?null:h.toFixed(3)+' m'}));
   const baseC=uniq(gnss.map(r=>M(r,'Base easting')?`E ${M(r,'Base easting')} · N ${M(r,'Base northing')} · Z ${M(r,'Base elevation')}`:null));
   const n={err:0,warn:0,info:0};S.issues.forEach(i=>{if(i.sev in n)n[i.sev]++});
-  const calc=rows.filter(r=>r.added);const ctl=rows.filter(r=>r.ctl&&r.ctl!=='ref');const refs=rows.filter(r=>r.ctl==='ref');
+  const calc=rows.filter(r=>r.added);const refs=rows.filter(r=>r.ctl==='ref');const cals=rows.filter(r=>r.ctl==='cal');
+  const calSec=refs.length&&(cals.length||(S.F&&S.F.fmt==='Emlid'));const knownSet=new Set(refs.map(r=>(r.mon||'').toLowerCase()));
+  // avec une calibration de site, toutes les mesures des points connus (levé et _stkd) vont dans la section Calibration
+  const calM=calSec?rows.filter(r=>(r.ctl==='cal'||r.ctl==='stkd')&&knownSet.has((r.mon||'').toLowerCase())):cals;
+  const ctl=rows.filter(r=>r.ctl&&r.ctl!=='ref'&&r.ctl!=='cal'&&!calM.includes(r));
   const mod=rows.filter(r=>isModified(r)&&!r.added).length;
   // qualité
   const st={};gnss.forEach(r=>{const s=M(r,'Solution status')||'?';st[s]=(st[s]||0)+1});
@@ -2777,7 +2789,7 @@ ${kv('Bibliothèque de codes',e(ti['Nom de bibliothèque']||''))}
 <h3 class="note">Résiduels du relèvement (points de référence)</h3>${tbl(['Point','ΔN','ΔE','ΔZ'],tb.resid.map(x=>`<tr${Math.max(Math.abs(+x.dN||0),Math.abs(+x.dE||0))>tolC?' class="out"':''}><td class="m">${e(x.name)}</td><td>${e(x.dN)}</td><td>${e(x.dE)}</td><td>${e(x.dZ)}</td></tr>`),'small')}
 <h3 class="note">Implantations / vérifications (écarts de l'instrument)</h3>${tbl(['Point mesuré','Point du projet','ΔN','ΔE','ΔZ'],tb.stake.map(x=>`<tr><td class="m">${e(x.name)}</td><td class="m">${e(x.design)}${x.designCode?' <span class="sub">'+e(x.designCode)+'</span>':''}</td><td>${e(x.dN||'')}</td><td>${e(x.dE||'')}</td><td>${e(x.dZ||'')}</td></tr>`),'small')}`):'';
   const ctlRows=ctl.map(r=>{const R=ctlRef(r);let d='<td colspan="4" class="na">pas de coordonnée de référence dans le fichier</td>',flag='';
-    if(R){const dE=r.e-R.e,dN=r.n-R.n,dZ=r.z-R.z,dH=Math.hypot(dE,dN);flag=dH>tolC||Math.abs(dZ)>tolC?' class="out"':'';d=`<td>${f3(dE)}</td><td>${f3(dN)}</td><td><b>${f3(dH)}</b></td><td>${f3(dZ)}</td>`}
+    if(R){const dE=r.e-R.e,dN=r.n-R.n,dZ=r.z-R.z,dH=Math.hypot(dE,dN);flag=dH>tolC||(!R.noZ&&Math.abs(dZ)>tolC)?' class="out"':'';d=`<td>${f3(dE)}</td><td>${f3(dN)}</td><td><b>${f3(dH)}</b></td><td>${R.noZ?'<span class="na">—</span>':f3(dZ)}</td>`+(R.ctl!=='ref'?'':'')}
     const c=CODES.get(parseDesc(r.desc).pcode);
     return `<tr${flag}><td class="m">${e(r.mon)}</td><td class="m">${e(r.name)}</td><td class="m">${e(r.fieldName)}</td><td>${e(parseDesc(r.desc).pcode||'')}${c?' '+e(c.abr):''}</td>${d}<td>${e(hm(M(r,'Averaging start')))}</td></tr>`});
   const html=`<!doctype html><html lang="fr-CA"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Rapport de levé ${e(base())}</title>
@@ -2815,7 +2827,7 @@ ${kv('Satellites utilisés',sats())}
 </div>${hasMeta||tb?'':'<p class="note">Pour compléter cette section, exportez tous les champs du levé (Emlid Flow : Exporter → CSV personnalisé → Tout sélectionner).</p>'}`)}
 ${tbSec}
 ${sec('Sommaire',`<div class="tiles">
-<div class="tile"><b>${meas.filter(r=>!r.ctl).length}</b><span>points levés</span></div>
+<div class="tile"><b>${meas.filter(r=>!r.ctl||r.ctl==='cal').length}</b><span>points levés</span></div>
 <div class="tile"><b>${calc.length}</b><span>points calculés</span></div>
 <div class="tile"><b>${ctl.length}</b><span>implantation / contrôle</span></div>
 <div class="tile"><b>${S.lines.length}</b><span>lignes</span></div>
@@ -2837,6 +2849,15 @@ ${kv('Observations par point',smp.length?`${Math.min(...smp)} à ${Math.max(...s
 ${tbl(['Matricule','Statut','RMS H','RMS V','PDOP','Heure','Description'],bad.map(r=>`<tr class="out"><td class="m">${e(r.name)}</td><td>${e(M(r,'Solution status')||'')}</td><td>${e(M(r,'Lateral RMS')||'')}</td><td>${e(M(r,'Elevation RMS')||'')}</td><td>${e(M(r,'PDOP')||'')}</td><td>${e(hm(M(r,'Averaging start')))}</td><td class="m">${descOf(r)}</td></tr>`))}`):''}
 ${(S.hiLog||[]).length?sec('Corrections de hauteur d\'antenne / prisme',tbl(['Points','Nb','Hauteur au terrain','Bonne hauteur','ΔZ appliqué','Heure'],S.hiLog.map(h=>`<tr><td class="m">${e(h.first)}${h.n>1?' à '+e(h.last):''}</td><td>${h.n}</td><td>${h.groups.map(g=>g.old.toFixed(3)+' m ('+g.n+')').join(', ')}</td><td>${h.hNew.toFixed(3)} m</td><td>${h.groups.map(g=>(-(h.hNew-g.old)).toFixed(3)).join(' / ')} m</td><td>${e(h.t)}</td></tr>`))+'<p class="note">Z corrigé = Z au terrain − (bonne hauteur − hauteur au terrain).</p>'):''}
 ${(S.renumLog||[]).length?sec('Renumérotation',S.renumLog.map(L=>`<p>Standard ArpentNord <b>${L.std==='J'?'jour julien AJJJSSNNN':'date AAMMJJNNNN'}</b> — ${L.map.length} point(s), ${e(L.t)}.</p>`+tbl(['Ancien','Nouveau'],L.map.map(([a,b])=>`<tr><td class="m">${e(a)}</td><td class="m">${e(b)}</td></tr>`),'small')).join('')):''}
+${calSec?sec('Calibration de site / points connus',(()=>{
+  const trs=[];for(const K of refs){const ms=calM.filter(x=>(x.mon||'').toLowerCase()===(K.mon||'').toLowerCase());const sk=[];
+    const kc=`<td class="m">${e(K.mon)}</td><td>${f3(K.e)}</td><td>${f3(K.n)}</td><td>${K.noZ?'<span class="na">—</span>':f3(K.z)}</td>`;
+    if(!ms.length){trs.push(`<tr>${kc}<td colspan="6" class="na">${sk.length?`non mesuré pendant le levé · ${sk.length} contrôle(s) d'implantation ci-dessous`:'non mesuré dans ce levé'}</td></tr>`);continue}
+    for(const x of ms){const dE=x.e-K.e,dN=x.n-K.n,dH=Math.hypot(dE,dN),dZ=x.z-K.z;const out=dH>tolC||(!K.noZ&&Math.abs(dZ)>tolC);
+      trs.push(`<tr${out?' class="out"':''}>${kc}<td class="m">${e(x.name)}<span class="sub"> · ${x.ctl==='cal'?'levé':'contrôle '+e(x.fieldName||'_stkd')}</span></td><td>${f3(dE)}</td><td>${f3(dN)}</td><td><b>${f3(dH)}</b></td><td>${K.noZ?'<span class="na">— (horizontal seulement)</span>':f3(dZ)}</td><td>${e(((M(x,'Averaging start')||'').match(/\d{4}-\d{2}-\d{2}/)||[''])[0]+' '+hm(M(x,'Averaging start')))}</td></tr>`)}}
+  const used=refs.filter(K=>calM.some(x=>(x.mon||'').toLowerCase()===(K.mon||'').toLowerCase()));
+  return `<p><b>Calibration de site sur ${used.length} point(s)</b>${used.length?' : '+used.map(K=>e(K.mon)).join(', '):''} — ${refs.length} point(s) connu(s) dans le fichier.</p>${tbl(['Point connu','E connu','N connu','Z connu','Point mesuré','ΔE','ΔN','ΔH','ΔZ','Date et heure'],trs)}
+<p class="note">Points connus : lignes d'origine « Local » de l'export Emlid (coordonnées saisies, non mesurées) ; ils ne sont pas comptés comme points levés ni exportés dans le _modif${$('oRef').checked?' (sauf option « exporter les références »)':''}. Mesures associées par le no du monument (description du point ou nom _stkd). Écarts = mesuré − connu ; ligne surlignée au-delà de ${tolC.toFixed(3)} m. Z connu = 0,000 : pas d'élévation connue, contrôle horizontal seulement. Les paramètres de la calibration (translation, rotation, échelle) ne figurent pas dans l'export CSV.</p>`})()):''}
 ${sec('Implantation et contrôle',`${tbl(['Monument','Matricule','Nom au terrain','Code','ΔE','ΔN','ΔH','ΔZ','Heure'],ctlRows)}
 <p class="note">Écarts = mesuré − référence. Ligne surlignée : écart horizontal ou vertical au-delà de ${tolC.toFixed(3)} m. Les points mesurés prennent le prochain matricule libre à la fin du levé ; le no du monument est inscrit en description.${refs.length?` Coordonnées de référence : ${refs.map(r=>`${e(r.mon)} (E ${f3(r.e)} · N ${f3(r.n)} · Z ${f3(r.z)})`).join(' ; ')} — ${$('oRef').checked?'exportées':'non exportées'} dans le _modif.`:''}</p>`)}
 ${sec('Points calculés',tbl(['Matricule','Calcul','Points de référence','E','N','Z','Élévation','Description'],calc.map(r=>{const c=r.calc||{};const refsN=(c.refs||[]).map(x=>x&&x.name?x.name:(S.rows[x]||{}).name).filter(Boolean);
