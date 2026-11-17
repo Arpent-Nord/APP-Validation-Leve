@@ -356,7 +356,7 @@ tr.hion td{background:color-mix(in srgb,#ffc440 18%,transparent)}
             <code>_</code><span>Liaison multiple sur un même point : <code>526 1.2_2.1</code> ferme le string 1 et débute le string 2 ; <code>181 1_186 1.1</code> continue le 181 et débute le 186 (double Pcode). Autant de liaisons que voulu.</span>
           </div>
           <p class="note">Format lu&nbsp;: <code>Matricule,Est,Nord,Élév,Description</code> où la description est <code>Pcode String.Contrôle [attributs]</code>, ex. <code>526 1.1</code>. Le fichier _modif est toujours écrit au format <code>P,N,E,Z,D</code> (Point, Nord, Est, Élév., Description), sans ligne d'en-tête, quel que soit le format lu. Il contient les descriptions corrigées, les coordonnées des points inversés et les points calculés (rectangle), insérés juste après le dernier point de leur ligne.</p>
-          <p class="note">Version v9.7.1-2026-11-17 · fonctionne hors ligne une fois ouverte · les fichiers restent sur l'appareil.</p>
+          <p class="note">Version v9.8-2026-11-17 · fonctionne hors ligne une fois ouverte · les fichiers restent sur l'appareil.</p>
           <div class="actions"><button class="btn sm" id="bJournal" type="button" disabled>Exporter le journal des corrections (.csv)</button><button class="btn sm" id="bResetLay" type="button">Rétablir les couches du gabarit</button></div>
         </div>
       </div>
@@ -400,9 +400,18 @@ tr.hion td{background:color-mix(in srgb,#ffc440 18%,transparent)}
   <div class="sheetbox wide" role="dialog" aria-labelledby="repTitle">
     <h2 id="repTitle">Rapport de levé</h2>
     <iframe id="repFrame" title="Aperçu du rapport"></iframe>
-    <div class="actions" style="justify-content:flex-start"><label class="btn filebtn">Ajouter des photos du terrain…<input type="file" id="phIn" accept="image/*" multiple></label><span class="note" id="phN"></span></div>
+    <div class="actions" style="justify-content:flex-start"><button class="btn" id="calOpen" type="button">Calibration de site (Emlid)…</button><span class="note" id="calN"></span><label class="btn filebtn">Ajouter des photos du terrain…<input type="file" id="phIn" accept="image/*" multiple></label><span class="note" id="phN"></span></div>
     <div id="phList" style="display:flex;gap:8px;flex-wrap:wrap;max-height:9.5em;overflow:auto"></div>
     <div class="actions"><button class="btn primary" id="repSave" type="button">Enregistrer _rapport.html</button><button class="btn" id="repPrint" type="button">Imprimer / PDF</button><button class="btn" id="repClose" type="button">Fermer</button></div>
+  </div>
+</div>
+<div class="sheet" id="calSheet" hidden>
+  <div class="sheetbox" role="dialog" aria-labelledby="calTitle">
+    <h2 id="calTitle">Calibration de site (localisation Emlid)</h2>
+    <p class="note">Dans Emlid Flow 360 : projet → <b>Informations sur le système de coordonnées</b>. Copiez la page (Ctrl+A, Ctrl+C) puis la page <b>Points de localisation</b>, et collez les deux ci-dessous (dans n'importe quel ordre). La calibration est retenue sur cet appareil pour ce système de coordonnées : les levés suivants du même système la reprennent d'office.</p>
+    <textarea id="calText" rows="9" style="width:100%;font-family:var(--mono,monospace);font-size:12px" placeholder="Coller ici le texte des deux pages Flow 360…"></textarea>
+    <div id="calPrev" class="note" style="max-height:12em;overflow:auto;margin:6px 0"></div>
+    <div class="actions"><button class="btn primary" id="calApply" type="button">Associer au levé</button><button class="btn" id="calClear" type="button">Retirer la calibration</button><button class="btn" id="calClose" type="button">Fermer</button></div>
   </div>
 </div>
 <div class="sheet" id="numSheet" hidden>
@@ -1354,7 +1363,7 @@ function load(text,name){
   if(!ok){toast(`${name} ne ressemble pas à un levé : attendu Matricule,Est,Nord,Élév,Description.`);return false}
   S.tool=null;if($('toolbar'))toolRender();
   F.rows.forEach((r,k)=>r.k0=k);S.srcText=text;S.sessKey=sessKeyOf(name,text);S.sessPending=null;$('sessBar').hidden=true;
-  S.F=F;S.rows=F.rows;S.fileName=name;S.cm=null;S.hl=null;$('cmSheet').hidden=true;S.enc=S.nextEnc||'windows-1252';S.nextEnc=null;S.hist=[];S.sel=null;S.cur=-1;S.journal=[];S.anas=[];if(!S.restoring)S.photos=[];
+  S.F=F;S.rows=F.rows;S.fileName=name;S.cm=null;S.hl=null;$('cmSheet').hidden=true;S.enc=S.nextEnc||'windows-1252';S.nextEnc=null;S.hist=[];S.sel=null;S.cur=-1;S.journal=[];S.anas=[];if(!S.restoring){S.photos=[];S.calib=null}
   const tNow=new Date().toLocaleString('fr-CA');
   for(const x of (F.leica&&F.leica.notes)||[]) S.journal.push({name:x.name,before:'',after:'',why:x.why,t:tNow});
   for(const x of F.renamed||[]) S.journal.push({name:x.name,before:`${x.old} · ${x.before}`,after:x.after,why:x.keep?`Nom non numérique ${x.old} (fichier d'un logiciel ou d'un tiers) renuméroté ${x.name} pour Civil 3D ; description conservée`:`Point d'implantation / contrôle ${x.old} renuméroté ${x.name} (nom non numérique refusé par Civil 3D) ; no du monument en description`,t:tNow});
@@ -1518,13 +1527,13 @@ function sessEntry(force){
 }
 /* Fichier de séance : même contenu que la sauvegarde automatique + analyses ajoutées au rapport */
 function sessFileName(){return S.fileName.replace(/\.[^.]+$/,'')+'_seance.json'}
-function sessDoc(){const ent=sessEntry(true);return ent&&Object.assign({type:'validation-leve-seance',v:1,app:'v9.7',saved:new Date().toISOString()},ent,{anas:S.anas||[],photos:S.photos||[]})}
+function sessDoc(){const ent=sessEntry(true);return ent&&Object.assign({type:'validation-leve-seance',v:1,app:'v9.7',saved:new Date().toISOString()},ent,{anas:S.anas||[],photos:S.photos||[],calib:S.calib||null})}
 $('bSess').onclick=()=>{if(!S.F)return;const doc=sessDoc(),ent=doc;
   const nm=sessFileName();save(nm,new Blob([JSON.stringify(doc)],{type:'application/json'}));
   S.journal.push({name:'Séance',before:'',after:nm,why:`Séance d'édition enregistrée dans ${nm} (${ent.n} point(s) corrigé(s))`,t:new Date().toLocaleString('fr-CA')});};
 function sessFromFile(txt,fname){let d;try{d=JSON.parse(txt)}catch(e){return false}
   if(!d||d.type!=='validation-leve-seance'||!d.text||!Array.isArray(d.rows)){return false}
-  sessRestore(d);S.anas=Array.isArray(d.anas)?d.anas:[];S.photos=Array.isArray(d.photos)?d.photos:[];
+  sessRestore(d);S.anas=Array.isArray(d.anas)?d.anas:[];S.photos=Array.isArray(d.photos)?d.photos:[];S.calib=d.calib||null;
   toast(`Séance reprise depuis ${fname} : ${d.n||0} point(s) corrigé(s), enregistrée le ${new Date(d.t||d.saved).toLocaleString('fr-CA')}${S.anas.length?` · ${S.anas.length} analyse(s)`:''}. Vous reprenez où vous en étiez.`);
   return true}
 function sessRestore(ent){
@@ -2663,8 +2672,54 @@ $('bDxf').onclick=()=>{if(numGate())return;
   if(errs)toast(`DXF produit avec ${errs} erreur(s) non corrigée(s) : ces points sont dessinés sans liaison.`);
 };
 $('bJournal').onclick=()=>{const f=csvFile();save(f.name,f.data)};
-$('bRep').onclick=()=>{$('repFrame').srcdoc=reportHTML();$('repSheet').hidden=false;phRefresh()};
+$('bRep').onclick=()=>{$('repFrame').srcdoc=reportHTML();$('repSheet').hidden=false;phRefresh();calNote()};
 $('repClose').onclick=()=>{$('repSheet').hidden=true};
+/* ---------- Calibration de site (localisation) Emlid Flow 360 : texte copié des pages « Informations sur le système de coordonnées » et « Points de localisation » ---------- */
+function calParse(txt){
+  const T=String(txt||'').replace(/\r/g,'').replace(/[\u00a0\u202f]/g,' ');const L=T.split('\n').map(x=>x.replace(/^\s*[*•-]\s*/,'').trim()).filter(Boolean);
+  const num=v=>{const m=/[-+]?\d+(?:[.,]\d+)?/.exec(v||'');return m?parseFloat(m[0].replace(',','.')):null};
+  const C={pairs:[],params:{}};
+  const iDet=L.findIndex(x=>/^D[ée]termin[ée] par la localisation/i.test(x));if(iDet>0){C.cs=L[iDet-1];const d=/•\s*(.+)$/.exec(L[iDet]);if(d)C.date=d[1].trim()}
+  const np=L.find(x=>/^\d+\s+paires?$/i.test(x));if(np)C.nPairs=parseInt(np);
+  // sections de paramètres
+  let sec='',sub='';const P=C.params;const put=(k,v)=>{P[k]=v};
+  for(const x of L){
+    if(/^Datum global$/i.test(x)){sec='dg';sub='';continue}if(/^Datum$/i.test(x)){sec='d';sub='';continue}if(/^Projection$/i.test(x)){sec='p';sub='';continue}
+    if(/^Ajustement horizontal$/i.test(x)){sec='h';sub='';continue}if(/^Mod[èe]le g[ée]o[ïi]de$/i.test(x)){sec='g';sub='';continue}if(/^Plan inclin[ée]$/i.test(x)){sec='v';sub='';continue}
+    if(/^(D[ée]calage|Origine|Pente)$/i.test(x)){sub=x.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');continue}
+    if(/^Points de localisation|^Estimation de la pr|^Paires de points/i.test(x)){sec='';continue}
+    let m;
+    if(sec==='d'&&(m=/^Ellipso[ïi]de\s*(.+)$/i.exec(x)))put('Ellipsoïde',m[1]);
+    if(sec==='d'&&(m=/^Demi-grand axe\s*(.+)$/i.exec(x)))put('Demi-grand axe',m[1]);
+    if(sec==='d'&&(m=/^1\s*\/\s*f\s*(.+)$/i.exec(x)))put('1 / f',m[1]);
+    if(sec==='p'){if((m=/^Type\s*(.+)$/i.exec(x)))put('Projection',m[1]);if((m=/^Latitude d'origine\s*(.+)$/i.exec(x)))put('Latitude d\'origine',m[1]);if((m=/^M[ée]ridien central\s*(.+)$/i.exec(x)))put('Méridien central',m[1]);
+      if((m=/^Facteur d'[ée]chelle\s*(.+)$/i.exec(x)))put('Facteur d\'échelle (projection)',m[1]);if((m=/^Fausse abscisse\s*(.+)$/i.exec(x)))put('Fausse abscisse',m[1]);if((m=/^Fausse ordonn[ée]e\s*(.+)$/i.exec(x)))put('Fausse ordonnée',m[1]);}
+    if(sec==='h'){if((m=/^(Est|Nord)\s*(.+)$/i.exec(x)))put(`${sub==='origine'?'Origine':'Décalage'} ${m[1]} (horizontal)`,m[2]);if((m=/^Rotation\s*(.+)$/i.exec(x)))put('Rotation',m[1]);if((m=/^Facteur d'[ée]chelle\s*(.+)$/i.exec(x)))put('Facteur d\'échelle (ajustement)',m[1]);}
+    if(sec==='g'&&!/^Plan/i.test(x)){put('Modèle géoïde',x);sec='';}
+    if(sec==='v'){if((m=/^D[ée]calage de l'altitude\s*(.+)$/i.exec(x)))put('Décalage de l\'altitude',m[1]);if((m=/^(Est|Nord)\s*(.+)$/i.exec(x)))put(`${sub==='pente'?'Pente':'Origine'} ${m[1]} (vertical)`,m[2]);}
+  }
+  // précision et paires
+  const iH=L.findIndex(x=>/^Horizontal$/i.test(x));if(iH>=0)C.precH=num(L[iH+1]);const iV=L.findIndex(x=>/^Vertical$/i.test(x));if(iV>=0)C.precV=num(L[iV+1]);
+  const iP=L.findIndex(x=>/^R[ée]sidus/i.test(x));
+  if(iP>=0){for(let k=iP+1;k<L.length;){const a=L[k],b=L[k+1],h=L[k+2],v=L[k+3];
+      if(a&&b&&/^H\s*[-\d]/.test(h||'')&&/^V\s*[-\d]/.test(v||'')){C.pairs.push({known:a,meas:b,h:num(h),v:num(v)});k+=4}
+      else if(a&&/^H\s*[-\d]/.test(b||'')&&/^V\s*[-\d]/.test(h||'')){C.pairs.push({known:a,meas:'',h:num(b),v:num(h)});k+=3}else k++}}
+  C.ok=!!(C.pairs.length||Object.keys(P).length);return C}
+const calKey=n=>String(n||'').replace(/\s*\+.*$/,'').trim().toLowerCase();
+function calCsName(){const r=S.rows.find(x=>x.meta&&x.meta['CS name']);return r?r.meta['CS name']:''}
+function calCurrent(){if(S.calib)return S.calib;const k=calKey(calCsName());if(!k)return null;const m=LS.get('vl.calib',{});return m[k]||null}
+function calNote(){const c=calCurrent();if($('calN'))$('calN').textContent=c?`${c.cs||'calibration'} · ${c.pairs.length} paire(s)`:(/calibr|locali/i.test(calCsName())?'système calibré : calibration non jointe':'')}
+function calPrevHtml(c){if(!c||!c.ok)return '<span style="color:var(--err)">Texte non reconnu : copiez les deux pages de Flow 360.</span>';
+  return `<b>${esc(c.cs||'(système sans nom)')}</b>${c.date?' · '+esc(c.date):''} · ${c.pairs.length} paire(s)${c.nPairs&&c.nPairs!==c.pairs.length?` <span style="color:var(--warn)">(la page en annonce ${c.nPairs})</span>`:''}${c.precH!=null?` · précision H ${c.precH.toFixed(3)} m, V ${(c.precV??0).toFixed(3)} m`:''}<br>${c.pairs.map(p=>`${esc(p.known)} ← ${esc(p.meas||'?')} : H ${p.h.toFixed(3)} · V ${p.v.toFixed(3)}`).join('<br>')}<br><span class="note">${Object.keys(c.params).length} paramètre(s) lu(s).</span>`}
+$('calOpen').onclick=()=>{const c=calCurrent();$('calText').value=c&&c.raw||'';$('calPrev').innerHTML=c?calPrevHtml(c):'';$('calSheet').hidden=false};
+$('calText').oninput=()=>{const t=$('calText').value;$('calPrev').innerHTML=t.trim()?calPrevHtml(calParse(t)):''};
+$('calClose').onclick=()=>{$('calSheet').hidden=true};
+$('calApply').onclick=()=>{const t=$('calText').value;const c=calParse(t);if(!c.ok){toast('Texte de calibration non reconnu.');return}
+  c.raw=t;c.t=new Date().toLocaleString('fr-CA');S.calib=c;const k=calKey(c.cs||calCsName());if(k){const m=LS.get('vl.calib',{});m[k]=c;LS.set('vl.calib',m)}
+  const cs=calKey(calCsName());if(c.cs&&cs&&calKey(c.cs)!==cs)toast(`Attention : calibration « ${c.cs} », levé en « ${calCsName()} ».`);else toast(`Calibration de site associée : ${c.pairs.length} paire(s).`);
+  S.journal.push({name:'Calibration',before:'',after:c.cs||'',why:`Calibration de site Emlid jointe au rapport (${c.pairs.length} paires)`,t:c.t});
+  $('calSheet').hidden=true;calNote();$('repFrame').srcdoc=reportHTML();sessSchedule()};
+$('calClear').onclick=()=>{const c=calCurrent();S.calib=null;if(c){const m=LS.get('vl.calib',{});delete m[calKey(c.cs||calCsName())];LS.set('vl.calib',m)}$('calText').value='';$('calPrev').innerHTML='';calNote();$('repFrame').srcdoc=reportHTML();toast('Calibration retirée.')};
 /* ---------- Photos du terrain (rapport) : réduites à 1600 px, gardées dans la séance ---------- */
 S.photos=S.photos||[];
 function phRefresh(){const L=S.photos;$('phN').textContent=L.length?`${L.length} photo(s) au rapport`:'aucune photo';
@@ -2849,15 +2904,27 @@ ${kv('Observations par point',smp.length?`${Math.min(...smp)} à ${Math.max(...s
 ${tbl(['Matricule','Statut','RMS H','RMS V','PDOP','Heure','Description'],bad.map(r=>`<tr class="out"><td class="m">${e(r.name)}</td><td>${e(M(r,'Solution status')||'')}</td><td>${e(M(r,'Lateral RMS')||'')}</td><td>${e(M(r,'Elevation RMS')||'')}</td><td>${e(M(r,'PDOP')||'')}</td><td>${e(hm(M(r,'Averaging start')))}</td><td class="m">${descOf(r)}</td></tr>`))}`):''}
 ${(S.hiLog||[]).length?sec('Corrections de hauteur d\'antenne / prisme',tbl(['Points','Nb','Hauteur au terrain','Bonne hauteur','ΔZ appliqué','Heure'],S.hiLog.map(h=>`<tr><td class="m">${e(h.first)}${h.n>1?' à '+e(h.last):''}</td><td>${h.n}</td><td>${h.groups.map(g=>g.old.toFixed(3)+' m ('+g.n+')').join(', ')}</td><td>${h.hNew.toFixed(3)} m</td><td>${h.groups.map(g=>(-(h.hNew-g.old)).toFixed(3)).join(' / ')} m</td><td>${e(h.t)}</td></tr>`))+'<p class="note">Z corrigé = Z au terrain − (bonne hauteur − hauteur au terrain).</p>'):''}
 ${(S.renumLog||[]).length?sec('Renumérotation',S.renumLog.map(L=>`<p>Standard ArpentNord <b>${L.std==='J'?'jour julien AJJJSSNNN':'date AAMMJJNNNN'}</b> — ${L.map.length} point(s), ${e(L.t)}.</p>`+tbl(['Ancien','Nouveau'],L.map.map(([a,b])=>`<tr><td class="m">${e(a)}</td><td class="m">${e(b)}</td></tr>`),'small')).join('')):''}
-${calSec?sec('Calibration de site / points connus',(()=>{
+${(()=>{const C=calCurrent();if(!C)return '';const tolV=+$('oTolV').value||.05;const P=C.params||{};
+  const kn=new Set(refs.map(r=>(r.mon||'').toLowerCase()));
+  const pr=C.pairs.map((p,k)=>`<tr${p.h>tolC||Math.abs(p.v)>tolV?' class="out"':''}><td>${k+1}</td><td class="m">${e(p.known)}${kn.has(String(p.known).toLowerCase())?' <span class="sub">· dans ce levé</span>':''}</td><td class="m">${e(p.meas)}</td><td>${p.h.toFixed(3)}</td><td>${p.v.toFixed(3)}</td></tr>`);
+  const grp=[['Datum',['Ellipsoïde','Demi-grand axe','1 / f']],['Projection',['Projection','Latitude d\'origine','Méridien central','Facteur d\'échelle (projection)','Fausse abscisse','Fausse ordonnée']],
+    ['Ajustement horizontal',['Décalage Est (horizontal)','Décalage Nord (horizontal)','Origine Est (horizontal)','Origine Nord (horizontal)','Rotation','Facteur d\'échelle (ajustement)']],['Vertical',['Modèle géoïde','Décalage de l\'altitude','Pente Est (vertical)','Pente Nord (vertical)','Origine Est (vertical)','Origine Nord (vertical)']]];
+  const ptr=grp.map(([g,ks])=>{const r=ks.filter(k=>P[k]!=null).map(k=>`<tr><td>${e(k.replace(/ \((horizontal|vertical|projection|ajustement)\)$/,''))}</td><td class="m">${e(P[k])}</td></tr>`);return r.length?`<tr><th colspan="2">${g}</th></tr>`+r.join(''):''}).join('');
+  return sec('Calibration de site (localisation)',`<div class="tiles"><div class="tile"><b>${C.pairs.length}</b><span>paires de points</span></div>${C.precH!=null?`<div class="tile"><b>${C.precH.toFixed(3)} m</b><span>précision horizontale</span></div>`:''}${C.precV!=null?`<div class="tile"><b>${C.precV.toFixed(3)} m</b><span>précision verticale</span></div>`:''}</div>
+<p>Système de coordonnées <b>${e(C.cs||'')}</b>${C.date?` — déterminé par la localisation le ${e(String(C.date).replace(/\.$/,''))}`:''}.${calKey(C.cs)!==calKey(calCsName())&&calCsName()?` <b style="color:#a86400">Attention : le levé est en « ${e(calCsName())} ».</b>`:''}</p>
+${tbl(['No','Point connu','Point mesuré (localisation)','Résidu H (m)','Résidu V (m)'],pr,'small')}
+${ptr?`<h3 class="note">Paramètres</h3><table class="small">${ptr}</table>`:''}
+<p class="note">Source : Emlid Flow 360, « Informations sur le système de coordonnées » et « Points de localisation » (copiés le ${e(C.t||'')}). Ligne surlignée : résidu horizontal au-delà de ${tolC.toFixed(3)} m ou vertical au-delà de ${tolV.toFixed(3)} m.</p>`)})()}
+${calSec?sec('Points connus contrôlés',(()=>{
   const trs=[];for(const K of refs){const ms=calM.filter(x=>(x.mon||'').toLowerCase()===(K.mon||'').toLowerCase());const sk=[];
     const kc=`<td class="m">${e(K.mon)}</td><td>${f3(K.e)}</td><td>${f3(K.n)}</td><td>${K.noZ?'<span class="na">—</span>':f3(K.z)}</td>`;
     if(!ms.length){trs.push(`<tr>${kc}<td colspan="6" class="na">${sk.length?`non mesuré pendant le levé · ${sk.length} contrôle(s) d'implantation ci-dessous`:'non mesuré dans ce levé'}</td></tr>`);continue}
     for(const x of ms){const dE=x.e-K.e,dN=x.n-K.n,dH=Math.hypot(dE,dN),dZ=x.z-K.z;const out=dH>tolC||(!K.noZ&&Math.abs(dZ)>tolC);
       trs.push(`<tr${out?' class="out"':''}>${kc}<td class="m">${e(x.name)}<span class="sub"> · ${x.ctl==='cal'?'levé':'contrôle '+e(x.fieldName||'_stkd')}</span></td><td>${f3(dE)}</td><td>${f3(dN)}</td><td><b>${f3(dH)}</b></td><td>${K.noZ?'<span class="na">— (horizontal seulement)</span>':f3(dZ)}</td><td>${e(((M(x,'Averaging start')||'').match(/\d{4}-\d{2}-\d{2}/)||[''])[0]+' '+hm(M(x,'Averaging start')))}</td></tr>`)}}
   const used=refs.filter(K=>calM.some(x=>(x.mon||'').toLowerCase()===(K.mon||'').toLowerCase()));
-  return `<p><b>Calibration de site sur ${used.length} point(s)</b>${used.length?' : '+used.map(K=>e(K.mon)).join(', '):''} — ${refs.length} point(s) connu(s) dans le fichier.</p>${tbl(['Point connu','E connu','N connu','Z connu','Point mesuré','ΔE','ΔN','ΔH','ΔZ','Date et heure'],trs)}
-<p class="note">Points connus : lignes d'origine « Local » de l'export Emlid (coordonnées saisies, non mesurées) ; ils ne sont pas comptés comme points levés ni exportés dans le _modif${$('oRef').checked?' (sauf option « exporter les références »)':''}. Mesures associées par le no du monument (description du point ou nom _stkd). Écarts = mesuré − connu ; ligne surlignée au-delà de ${tolC.toFixed(3)} m. Z connu = 0,000 : pas d'élévation connue, contrôle horizontal seulement. Les paramètres de la calibration (translation, rotation, échelle) ne figurent pas dans l'export CSV.</p>`})()):''}
+  const C=calCurrent(),csN=calCsName(),pairSet=new Set(((C&&C.pairs)||[]).map(p=>String(p.known).toLowerCase()));
+  return `<p><b>${used.length} point(s) connu(s) contrôlé(s) pendant le levé</b>${used.length?' : '+used.map(K=>e(K.mon)+(pairSet.has((K.mon||'').toLowerCase())?' <span class="sub">(paire de calibration)</span>':'')).join(', '):''} — ${refs.length} point(s) connu(s) dans le fichier.${!C&&/calibr|locali/i.test(csN)?` <b style="color:#a86400">Le système « ${e(csN.replace(/\s*\+.*$/,''))} » est déterminé par une calibration de site : ses paires et paramètres ne sont pas dans l'export CSV ; joignez-les avec « Calibration de site (Emlid)… » dans la fenêtre du rapport.</b>`:''}</p>${tbl(['Point connu','E connu','N connu','Z connu','Point mesuré','ΔE','ΔN','ΔH','ΔZ','Date et heure'],trs)}
+<p class="note">Points connus : lignes d'origine « Local » de l'export Emlid (coordonnées saisies, non mesurées) ; ils ne sont pas comptés comme points levés ni exportés dans le _modif${$('oRef').checked?' (sauf option « exporter les références »)':''}. Mesures associées par le no du monument (description du point ou nom _stkd). Écarts = mesuré − connu ; ligne surlignée au-delà de ${tolC.toFixed(3)} m. Z connu = 0,000 : pas d'élévation connue, contrôle horizontal seulement. ${calCurrent()?'Paires et paramètres de la calibration : voir la section « Calibration de site ».':'Les paires et paramètres d\'une calibration de site ne figurent pas dans l\'export CSV.'}</p>`})()):''}
 ${sec('Implantation et contrôle',`${tbl(['Monument','Matricule','Nom au terrain','Code','ΔE','ΔN','ΔH','ΔZ','Heure'],ctlRows)}
 <p class="note">Écarts = mesuré − référence. Ligne surlignée : écart horizontal ou vertical au-delà de ${tolC.toFixed(3)} m. Les points mesurés prennent le prochain matricule libre à la fin du levé ; le no du monument est inscrit en description.${refs.length?` Coordonnées de référence : ${refs.map(r=>`${e(r.mon)} (E ${f3(r.e)} · N ${f3(r.n)} · Z ${f3(r.z)})`).join(' ; ')} — ${$('oRef').checked?'exportées':'non exportées'} dans le _modif.`:''}</p>`)}
 ${sec('Points calculés',tbl(['Matricule','Calcul','Points de référence','E','N','Z','Élévation','Description'],calc.map(r=>{const c=r.calc||{};const refsN=(c.refs||[]).map(x=>x&&x.name?x.name:(S.rows[x]||{}).name).filter(Boolean);
