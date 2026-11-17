@@ -26,7 +26,7 @@
    - **Annuler**, **Historique** (annuler une correction précise).
 6. **ANALYSE** (facultatif) : analyse d'un fossé entre deux points (eau accumulée, débordement, sens et pente d'écoulement) → « Ajouter au rapport ».
 7. **Fond** (facultatif) : orthophoto du projet (image + fichier de référence) ou imagerie en ligne.
-8. **Rapport** : aperçu, ajout de photos du terrain, « Enregistrer _rapport.html » ou « Imprimer / PDF ».
+8. **Rapport** : aperçu, **calibration de site Emlid** (coller le texte des pages Flow 360 « Informations sur le système de coordonnées » et « Points de localisation »), ajout de photos du terrain, « Enregistrer _rapport.html » ou « Imprimer / PDF ».
 9. **Exporter _modif.txt** et **Exporter DXF** ; **Envoyer par Outlook…** au besoin.
 10. **Sauvegarder la séance** pour reprendre plus tard (ou sur un autre poste) : le fichier `_seance.json` se rouvre avec « Ouvrir un levé… ». Une sauvegarde automatique est aussi gardée dans le navigateur (5 derniers levés).
 
@@ -42,6 +42,7 @@ Un guide illustré est disponible : `guide.html` (bouton Documentation de la Bo�
 | Levé Trimble Access | rapport HTML (.htm) | stations, résiduels, implantations |
 | Fichier de tiers / logiciel | CSV avec noms non numériques | renumérotés, nom d'origine au journal |
 | Orthophoto du projet | JPG / PNG + `.jgw` / `.pgw` / `.wld` et/ou `.aux.xml` / `.prj` | MTM, UTM ou degrés (converti en MTM) ; grandes images réduites à 8192 px |
+| Calibration de site Emlid | texte copié de Flow 360 (2 pages) | paires et résidus, précision, paramètres ; retenue par nom de système |
 | Photos du terrain | JPG / PNG | réduites à 1600 px, légende, ajoutées au rapport |
 | **Sortie Civil 3D** | `<levé>_modif.txt` | `P,N,E,Z,D`, virgule, CRLF, **sans en-tête** |
 | Dessin | `<levé>.dxf` | points + polylignes par code, couches NouvLR |
@@ -74,7 +75,7 @@ Un guide illustré est disponible : `guide.html` (bouton Documentation de la Bo�
 - **Codes :** liste ArpentNord (numéro, abréviation APH, description, catégorie, couche NouvLR). Codes hors standard associés par l'outil CODES ; texte d'origine gardé en attribut au besoin.
 - **Numérotation standard (obligatoire pour exporter) :** Date `AAMMJJNNNN` ou jour julien `AJJJSSNNN`. 9 arpenteurs et moins : arpenteur k = plage (k−1)·1000+1 à +998 ; dépassement / levé d'un tiers : 9001-9999 ; numéros en x000 hors plage. Limite Civil 3D : 1 à 4 294 967 295 (standard Date valide jusqu'au 2042-12-31).
 - **Hauteur d'antenne / prisme :** Z corrigé = Z − (bonne hauteur − hauteur au terrain).
-- **Points connus et contrôle :** Emlid origine « Local », Leica / Trimble points connus = références (non exportées par défaut ; Z = 0,000 → contrôle horizontal seulement). Mesures sur ces points (no du monument en description) = **calibration de site** ; `_stkd` = implantation (le point mesuré prend le prochain matricule libre, le no du monument passe en description). Écarts = mesuré − référence ; tolérance de contrôle par défaut 0,030 m (Options).
+- **Points connus et contrôle :** Emlid origine « Local », Leica / Trimble points connus = références (non exportées par défaut ; Z = 0,000 → contrôle horizontal seulement). Mesures sur ces points pendant le levé (no du monument en description ou `_stkd`) = **points connus contrôlés** ; la **calibration de site** elle-même (paires, résidus, paramètres) vient de Flow 360 (texte collé) car l'export CSV ne la contient pas ; `_stkd` = implantation (le point mesuré prend le prochain matricule libre, le no du monument passe en description). Écarts = mesuré − référence ; tolérance de contrôle par défaut 0,030 m (Options).
 - **Qualité GNSS (rapport) :** statut FIX, RMS horizontal (tolérance 0,030 m) et vertical (0,050 m), PDOP, époques, distance à la base.
 - **Points calculés :** commandes au terrain (`2P`, `2PD`, `2D`, `3PP`, `4P`, `3C`, `RECT`) ou outils ; marqués `CALCUL`, élévation à confirmer quand elle est posée à 0.
 - **Analyse de fossé (ANALYSE) :**
@@ -87,7 +88,7 @@ Un guide illustré est disponible : `guide.html` (bouton Documentation de la Bo�
 
 ## 7. Limites connues et pistes d'amélioration
 
-- Les paramètres de la calibration de site (translation, rotation, échelle) ne sont pas dans l'export CSV Emlid : le rapport montre les écarts des points connus seulement.
+- La calibration de site n'est pas dans l'export CSV Emlid : elle doit être collée depuis Flow 360 (retenue ensuite sur l'appareil pour le même système).
 - Analyse de fossé : triangulation sans contraintes strictes (lignes densifiées), résultats indicatifs.
 - Imagerie en ligne : selon le serveur, le fond peut être absent de l'image du rapport (le rapport l'indique).
 - Dossier de travail : Chrome / Edge sur ordinateur seulement ; la sauvegarde automatique du navigateur reste propre à un poste.
@@ -106,7 +107,8 @@ Un guide illustré est disponible : `guide.html` (bouton Documentation de la Bo�
 | v9.6 | 2026-11-03 | Fichier de séance ; dossier de travail |
 | v9.6.1-9.6.6 | 2026-11-03 | Analyse : limite à ne pas franchir, frontières, ligne du profil, pente moyenne centre + bords, repères 1/2 |
 | v9.7 | 2026-11-03 | Rapport : vue épurée, profil orienté comme le plan, tableau d'écoulement, photos du terrain |
-| v9.7.1 | 2026-11-17 | Calibration de site Emlid : points connus (Local) non exportés, section Calibration au rapport ; dépôt renommé APP-Validation-Leve |
+| v9.7.1 | 2026-11-17 | Points connus Emlid (Local) non exportés ni comptés ; dépôt renommé APP-Validation-Leve |
+| v9.8 | 2026-11-17 | Calibration de site Emlid jointe au rapport (paires, résidus, paramètres) ; section « Points connus contrôlés » |
 
 ## 9. Responsables
 
