@@ -356,7 +356,7 @@ tr.hion td{background:color-mix(in srgb,#ffc440 18%,transparent)}
             <code>_</code><span>Liaison multiple sur un même point : <code>526 1.2_2.1</code> ferme le string 1 et débute le string 2 ; <code>181 1_186 1.1</code> continue le 181 et débute le 186 (double Pcode). Autant de liaisons que voulu.</span>
           </div>
           <p class="note">Format lu&nbsp;: <code>Matricule,Est,Nord,Élév,Description</code> où la description est <code>Pcode String.Contrôle [attributs]</code>, ex. <code>526 1.1</code>. Le fichier _modif est toujours écrit au format <code>P,N,E,Z,D</code> (Point, Nord, Est, Élév., Description), sans ligne d'en-tête, quel que soit le format lu. Il contient les descriptions corrigées, les coordonnées des points inversés et les points calculés (rectangle), insérés juste après le dernier point de leur ligne.</p>
-          <p class="note">Version v9.10-2026-11-18 · fonctionne hors ligne une fois ouverte · les fichiers restent sur l'appareil.</p>
+          <p class="note">Version v9.11-2026-11-18 · fonctionne hors ligne une fois ouverte · les fichiers restent sur l'appareil.</p>
           <div class="actions"><button class="btn sm" id="bJournal" type="button" disabled>Exporter le journal des corrections (.csv)</button><button class="btn sm" id="bResetLay" type="button">Rétablir les couches du gabarit</button></div>
         </div>
       </div>
@@ -2077,6 +2077,7 @@ function toolRender(){
   const bar=$('toolbar');if(!S.tool){bar.hidden=true;S.rectPrev=null;S.calcPrev=null;if(S.rows.length)renderPts();return}
   bar.classList.toggle('ana',S.tool.kind==='ana');
   if(S.tool.kind==='ana'){anaRender(bar);return}
+  if(S.tool.kind==='ulpick'){ulPickRender(bar);return}
   if(CMD_NEED[S.tool.kind]&&S.tool.kind!=='RECT'){calcToolRender(bar);return}
   const t=S.tool,n=t.picks.map(i=>S.rows[i].name);bar.hidden=false;
   let msg,ok=false,extra='';
@@ -2578,6 +2579,7 @@ function draw(){
   const selL=(S.tool?.kind==='close'||S.tool?.kind==='link'||S.tool?.kind==='cut')&&S.tool.opts&&S.tool.opts[S.tool.opt]?S.tool.opts[S.tool.opt].line:S.tool?.kind==='rev'&&S.tool.line?S.tool.line:(S.sel!=null?S.lineOf.get(S.sel):null);
   const DOFF=S.tool&&S.tool.kind==='ana'&&S.tool.off&&S.tool.off.size?S.tool.off:null;
   S.lines.forEach((L,k)=>{if(DOFF&&DOFF.has(String(L.pcode)))return;const v=S.verts[k];ctx.strokeStyle=colOfCode(L.pcode);ctx.lineWidth=L===selL?3:1.4;ctx.beginPath();v.forEach((p,j)=>{const [x,y]=W2S(p[0],p[1]);j?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.stroke();});
+  if(S.tool&&S.tool.kind==='ulpick'&&S.tool.sel.size){ctx.strokeStyle='#e5484d';ctx.lineWidth=4;S.lines.forEach((L,k)=>{if(!S.tool.sel.has(ulId(L)))return;const v=S.verts[k];ctx.beginPath();v.forEach((p,j)=>{const [x,y]=W2S(p[0],p[1]);j?ctx.lineTo(x,y):ctx.moveTo(x,y)});if(v.length===1){const [x,y]=W2S(v[0][0],v[0][1]);ctx.arc(x,y,7,0,7)}ctx.stroke()})}
   try{anaDraw()}catch(e){console.error(e)}
   // points
   const showInfo=$('fInfo').checked;
@@ -2642,6 +2644,7 @@ cv.addEventListener('pointermove',e=>{
   if(pinch&&ptrs.size===2){const [a,b]=[...ptrs.values()];S.view.k=pinch.k*Math.hypot(a[0]-b[0],a[1]-b[1])/pinch.d;moved=true;draw();return}
   if(drag){const dx=e.offsetX-drag.x,dy=e.offsetY-drag.y;if(Math.abs(dx)+Math.abs(dy)>3)moved=true;S.view.cx-=dx/S.view.k;S.view.cy+=dy/S.view.k;drag={x:e.offsetX,y:e.offsetY};draw()}});
 cv.addEventListener('pointerup',e=>{ptrs.delete(e.pointerId);if(ptrs.size<2)pinch=null;
+  if(!moved&&S.view&&ptrs.size===0&&S.tool&&S.tool.kind==='ulpick'){ulPickAt(e.offsetX,e.offsetY);drag=null;return}
   if(!moved&&S.view&&ptrs.size===0){let best=-1,bd=14;for(const r of S.rows){if(r.bad)continue;const [x,y]=W2S(r.e,r.n);const d=Math.hypot(x-e.offsetX,y-e.offsetY);if(d<bd){bd=d;best=r.i}}
     if(best>=0&&S.tool){toolPick(best);return}
     if(best>=0&&S.swapPick!=null&&best!==S.swapPick){const a=S.swapPick;doSwap(a,best,!!S.swapDesc);select(a,false);return}
@@ -3069,14 +3072,36 @@ function ulOpen(){if(!S.rows.length){toast('Ouvrez d\'abord un levé.');return}
   const cnt=new Map();for(const r of S.rows){if(r.bad||r.ctl==='ref')continue;const p=parseDesc(r.desc);if(p.err||!p.links.length)continue;for(const pc of new Set([p.pcode,...p.links.map(l=>l.pcode)]))if(pc)cnt.set(pc,(cnt.get(pc)||0)+1)}
   if(!cnt.size){toast('Aucun code de liaison à effacer dans ce levé.');return}
   const tot=S.rows.filter(r=>!r.bad&&r.ctl!=='ref'&&parseDesc(r.desc).links.length).length;
-  $('ulScope').innerHTML=`<option value="*">Tout le levé (${tot} points liés)</option>`+[...cnt.entries()].sort((a,b)=>b[1]-a[1]).map(([pc,n])=>{const c=CODES.get(pc);return `<option value="${esc(pc)}">${esc(pc)}${c?' '+esc(c.abr)+' · '+esc(c.desc):''} (${n} points)</option>`}).join('');
+  $('ulScope').innerHTML=`<option value="*">Tout le levé (${tot} points liés)</option><option value="@">Lignes choisies sur le plan… (toucher les lignes)</option>`+[...cnt.entries()].sort((a,b)=>b[1]-a[1]).map(([pc,n])=>{const c=CODES.get(pc);return `<option value="${esc(pc)}">${esc(pc)}${c?' '+esc(c.abr)+' · '+esc(c.desc):''} (${n} points)</option>`}).join('');
   $('ulSheet').hidden=false;ulPrev()}
-function ulPrev(){const T=ulTargets();$('ulGo').disabled=!T.length;
+function ulPrev(){if($('ulScope').value==='@'){$('ulSheet').hidden=true;S.tool={kind:'ulpick',picks:[],sel:new Map()};toolRender();draw();return}
+  const T=ulTargets();$('ulGo').disabled=!T.length;
   $('ulPrev').innerHTML=T.length?`${T.length} point(s) changent, ex. <span class="mono">${esc(T[0][0].desc)} → ${esc(T[0][1])}</span>. Annulable avec Annuler ou Historique.`:'Rien à effacer pour ce choix.'}
 function ulApply(){const T=ulTargets();if(!T.length)return;const items=T.map(([r])=>({r,st:snapState(r)}));const now=new Date().toLocaleString('fr-CA');
   const sc=$('ulScope').value;for(const [r,nd] of T){S.journal.push({name:r.name,before:r.desc,after:nd,why:`Liaisons effacées${sc==='*'?'':' (code '+sc+')'} : lignes à refaire à la main`,t:now});r.desc=nd;}
   S.hist.push({type:'snap',items,fields:['desc'],label:'Liaisons effacées'});$('ulSheet').hidden=true;run();
   toast(`${T.length} point(s) sans liaison. Refaites les lignes avec LIER 2 PTS : point 1, point 2, puis la suite.`);S.tool=null;toolStart('link')}
+/* Choix des lignes sur le plan : toucher une ligne la choisit (rouge), la retoucher la retire. Seule la liaison de ces lignes est retirée. */
+const ulId=L=>L.key+'@'+L.pts[0];
+function ulPickRender(bar){const t=S.tool;bar.hidden=false;const L=[...t.sel.values()];
+  const names=L.slice(0,8).map(x=>`<b class="mono">${esc(x.pcode)} / ${esc(x.str)}</b>`).join(', ')+(L.length>8?` … (+${L.length-8})`:'');
+  bar.innerHTML=`<div class="tbmsg">${L.length?`${L.length} ligne(s) à effacer : ${names}. Touchez une autre ligne pour l'ajouter, une ligne rouge pour la retirer.`:'Touchez sur le plan les lignes dont la liaison est à effacer (elles passent au rouge).'}</div>
+    <div class="actions"><button class="btn sm primary" id="ulpGo" type="button" ${L.length?'':'disabled'}>Effacer les liaisons${L.length?' ('+L.length+')':''}</button><button class="btn sm" id="ulpClr" type="button" ${L.length?'':'disabled'}>Vider le choix</button><button class="btn sm" id="ulpClose" type="button">Fermer</button></div>`;
+  $('ulpGo').onclick=ulPickApply;$('ulpClr').onclick=()=>{t.sel.clear();toolRender();draw()};$('ulpClose').onclick=()=>{S.tool=null;toolRender();draw()}}
+function ulPickAt(sx,sy){let best=null,bd=12;
+  S.lines.forEach((L,k)=>{const v=(S.verts[k]||[]).map(p=>W2S(p[0],p[1]));
+    if(v.length===1){const d=Math.hypot(v[0][0]-sx,v[0][1]-sy);if(d<bd){bd=d;best=L}}
+    for(let j=1;j<v.length;j++){const [ax,ay]=v[j-1],[bx,by]=v[j];const dx=bx-ax,dy=by-ay,l2=dx*dx+dy*dy;let u=l2?((sx-ax)*dx+(sy-ay)*dy)/l2:0;u=Math.max(0,Math.min(1,u));
+      const d=Math.hypot(ax+u*dx-sx,ay+u*dy-sy);if(d<bd){bd=d;best=L}}});
+  if(!best){toast('Aucune ligne à cet endroit : touchez plus près d\'une ligne.');return}
+  const id=ulId(best);if(S.tool.sel.has(id))S.tool.sel.delete(id);else S.tool.sel.set(id,best);toolRender();draw()}
+function ulPickApply(){const L=[...S.tool.sel.values()];if(!L.length)return;const nd=new Map();
+  for(const l of L)for(const i of l.pts){const r=S.rows[i];if(!r||r.ctl==='ref')continue;nd.set(r,patchLinkDesc(nd.has(r)?nd.get(r):r.desc,l.key,()=>null))}
+  const T=[...nd.entries()].filter(([r,d])=>d!==r.desc);if(!T.length){toast('Rien à effacer.');return}
+  const items=T.map(([r])=>({r,st:snapState(r)}));const now=new Date().toLocaleString('fr-CA');const lst=L.map(l=>l.pcode+' / '+l.str).join(', ');
+  for(const [r,d] of T){S.journal.push({name:r.name,before:r.desc,after:d,why:`Liaison effacée (ligne choisie sur le plan : ${lst}) : à refaire à la main`,t:now});r.desc=d;}
+  S.hist.push({type:'snap',items,fields:['desc'],label:`Liaisons effacées (${L.length} ligne(s))`});S.tool=null;run();
+  toast(`${L.length} ligne(s) effacée(s), ${T.length} point(s) changés. Refaites-les avec LIER 2 PTS : point 1, point 2, puis la suite.`);toolStart('link')}
 $('tUnlinkAll').onclick=ulOpen;$('ulScope').onchange=ulPrev;$('ulGo').onclick=ulApply;$('ulClose').onclick=()=>{$('ulSheet').hidden=true};
 $('bHist').onclick=()=>{$('histSheet').hidden=false;histRender()};$('histClose').onclick=()=>{$('histSheet').hidden=true};
 $('histList').onclick=e=>{const b=e.target.closest('button[data-k]');if(b)undoSelect(+b.dataset.k)};
