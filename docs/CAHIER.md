@@ -37,7 +37,7 @@ Un guide illustré est disponible : `guide.html` (bouton Documentation de la Bo�
 | Élément | Format | Détails |
 |---|---|---|
 | Levé texte ArpentNord / Leica | `P,N,E,Z,D` ou `P,E,N,Z,D` (virgule, point-virgule, tabulation ou espace) | ordre N/E détecté sur les valeurs ; lignes `#` (PROJET, DATE, OPÉRATEUR) lues |
-| Levé Emlid Flow | CSV « tout sélectionner » (Code + Description + qualité GNSS) | origine **Local** = point connu (calibration / contrôle) ; `_stkd` = implantation |
+| Levé Emlid Flow | CSV « tout sélectionner » (Code + Description + qualité GNSS) | origine **Local** = point connu (calibration / contrôle) ; `_stkd` = implantation ; code de type ligne « 526_2 » = Pcode 526, string 2 (.1 au 1er point, `CLS` = fermeture .2) |
 | Levé Leica CS20 | rapport « RAPPORT D'ARPENTAGE » (FRT) | strings, fermetures, points connus |
 | Levé Trimble Access | rapport HTML (.htm) | stations, résiduels, implantations |
 | Fichier de tiers / logiciel | CSV avec noms non numériques | renumérotés, nom d'origine au journal |
@@ -109,6 +109,7 @@ Un guide illustré est disponible : `guide.html` (bouton Documentation de la Bo�
 | v9.7 | 2026-11-03 | Rapport : vue épurée, profil orienté comme le plan, tableau d'écoulement, photos du terrain |
 | v9.7.1 | 2026-11-17 | Points connus Emlid (Local) non exportés ni comptés ; dépôt renommé APP-Validation-Leve |
 | v9.8 | 2026-11-17 | Calibration de site Emlid jointe au rapport (paires, résidus, paramètres) ; section « Points connus contrôlés » |
+| v9.9 | 2026-11-18 | Lignes tracées dans Emlid (code « 526_2 », Control code CLS) reprises d'office en liaisons ArpentNord |
 
 ## 9. Responsables
 
