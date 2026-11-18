@@ -356,7 +356,7 @@ tr.hion td{background:color-mix(in srgb,#ffc440 18%,transparent)}
             <code>_</code><span>Liaison multiple sur un même point : <code>526 1.2_2.1</code> ferme le string 1 et débute le string 2 ; <code>181 1_186 1.1</code> continue le 181 et débute le 186 (double Pcode). Autant de liaisons que voulu.</span>
           </div>
           <p class="note">Format lu&nbsp;: <code>Matricule,Est,Nord,Élév,Description</code> où la description est <code>Pcode String.Contrôle [attributs]</code>, ex. <code>526 1.1</code>. Le fichier _modif est toujours écrit au format <code>P,N,E,Z,D</code> (Point, Nord, Est, Élév., Description), sans ligne d'en-tête, quel que soit le format lu. Il contient les descriptions corrigées, les coordonnées des points inversés et les points calculés (rectangle), insérés juste après le dernier point de leur ligne.</p>
-          <p class="note">Version v9.13-2026-11-18 · fonctionne hors ligne une fois ouverte · les fichiers restent sur l'appareil.</p>
+          <p class="note">Version v9.14-2026-11-18 · fonctionne hors ligne une fois ouverte · les fichiers restent sur l'appareil.</p>
           <div class="actions"><button class="btn sm" id="bJournal" type="button" disabled>Exporter le journal des corrections (.csv)</button><button class="btn sm" id="bResetLay" type="button">Rétablir les couches du gabarit</button></div>
         </div>
       </div>
@@ -399,6 +399,8 @@ tr.hion td{background:color-mix(in srgb,#ffc440 18%,transparent)}
 <div class="sheet" id="repSheet" hidden>
   <div class="sheetbox wide" role="dialog" aria-labelledby="repTitle">
     <h2 id="repTitle">Rapport de levé</h2>
+    <div class="field"><label for="repT">Titre du rapport</label><input id="repT" type="text" placeholder="Rapport de levé" autocomplete="off"></div>
+    <div class="field"><label for="repC">Commentaires (paraissent au début du rapport)</label><textarea id="repC" rows="2" placeholder="ex. Implantation d'un bouton poussoir sur le trottoir existant. Une marque au feutre indique ce point, voir les photos ci-dessous."></textarea></div>
     <iframe id="repFrame" title="Aperçu du rapport"></iframe>
     <div class="actions" style="justify-content:flex-start"><button class="btn" id="calOpen" type="button">Calibration de site (Emlid)…</button><span class="note" id="calN"></span><label class="btn filebtn">Ajouter des photos du terrain…<input type="file" id="phIn" accept="image/*" multiple></label><span class="note" id="phN"></span></div>
     <div id="phList" style="display:flex;gap:8px;flex-wrap:wrap;max-height:9.5em;overflow:auto"></div>
@@ -713,12 +715,18 @@ function parseLeicaFRT(text){
    à la fin de la séquence ; le no du monument passe en description (« 9 118150B »).
    La coordonnée de référence (118150B, sans _stkd) sert au contrôle et n'est pas exportée par défaut. */
 function prepControl(rows){
-  const num=rows.filter(r=>/^\d+$/.test(r.name));if(!num.length)return [];
+  const num=rows.filter(r=>/^\d+$/.test(r.name));
   let max=0,w=0;for(const r of num){const v=+r.name;if(v>max){max=v;w=r.name.length}}
+  if(!num.length){// aucun point numéroté (ex. implantation seulement) : standard date AAMMJJNNNN, plage de l'arpenteur retenu sur cet appareil
+    const d=rows.map(r=>r.meta&&/(\d{4})-(\d{2})-(\d{2})/.exec(r.meta['Averaging start']||r.meta['Date']||'')).find(Boolean);
+    let k=1;try{k=Math.min(9,Math.max(1,+(localStorage.getItem('vl.arp')||'1').replace(/"/g,'')||1))}catch(e){}
+    if(d){max=+(d[1].slice(2)+d[2]+d[3])*10000+(k-1)*1000;w=10}}
   const lower=new Set(rows.map(r=>r.name.toLowerCase()));const out=[];
   // Emlid : origine « Local » = coordonnées connues saisies (points de calibration / contrôle), pas des mesures
   const isLocal=r=>r.meta&&/^local$/i.test(String(r.meta['Origin']||r.meta['origin']||'').trim());
-  const known=new Map();for(const r of rows)if(!r.bad&&isLocal(r)&&!/[_-]?stkd$/i.test(r.name)){r.ctl='ref';r.mon=r.name;r.noZ=Math.abs(r.z)<1e-9;known.set(r.name.toLowerCase(),r)}
+  const known=new Map();for(const r of rows)if(!r.bad&&isLocal(r)&&!/[_-]?stkd$/i.test(r.name)){r.ctl='ref';r.mon=r.name;r.noZ=Math.abs(r.z)<1e-9;known.set(r.name.toLowerCase(),r);
+    // point connu = monument / repère (no du type 312371A, ou code « monument, repère, borne… ») ; sinon point de conception saisi au terrain (BOUTON, LIGNE1) à implanter
+    const txt=[r.meta['Code'],r.meta['Code description'],r.meta['Description']].join(' ');r.design=!(/^\d{3,9}[a-z]{0,2}$/i.test(r.name)||/monum|rep[eè]re|borne|g[ée]od|rgi|tige|scopq/i.test(txt))}
   // mesures sur ces points connus (calibration de site) : no du monument dans la Description, sinon dans « Code description »
   if(known.size)for(const r of rows){if(r.bad||r.ctl||!/^\d+$/.test(r.name))continue;const m=r.meta||{};
     const toks=s=>String(s||'').split(/[\s,;]+/).map(x=>x.toLowerCase()).filter(Boolean);
@@ -1383,7 +1391,7 @@ function load(text,name){
   if(!ok){toast(`${name} ne ressemble pas à un levé : attendu Matricule,Est,Nord,Élév,Description.`);return false}
   S.tool=null;if($('toolbar'))toolRender();
   F.rows.forEach((r,k)=>r.k0=k);S.srcText=text;S.sessKey=sessKeyOf(name,text);S.sessPending=null;$('sessBar').hidden=true;
-  S.F=F;S.rows=F.rows;S.fileName=name;S.cm=null;S.hl=null;$('cmSheet').hidden=true;S.enc=S.nextEnc||'windows-1252';S.nextEnc=null;S.hist=[];S.sel=null;S.cur=-1;S.journal=[];S.anas=[];if(!S.restoring){S.photos=[];S.calib=null}
+  S.F=F;S.rows=F.rows;S.fileName=name;S.cm=null;S.hl=null;$('cmSheet').hidden=true;S.enc=S.nextEnc||'windows-1252';S.nextEnc=null;S.hist=[];S.sel=null;S.cur=-1;S.journal=[];S.anas=[];if(!S.restoring){S.photos=[];S.calib=null;S.repTitle='';S.repNote='';S.purgeAsk=false}
   const tNow=new Date().toLocaleString('fr-CA');
   for(const x of (F.leica&&F.leica.notes)||[]) S.journal.push({name:x.name,before:'',after:'',why:x.why,t:tNow});
   for(const x of F.renamed||[]) S.journal.push({name:x.name,before:`${x.old} · ${x.before}`,after:x.after,why:x.keep?`Nom non numérique ${x.old} (fichier d'un logiciel ou d'un tiers) renuméroté ${x.name} pour Civil 3D ; description conservée`:`Point d'implantation / contrôle ${x.old} renuméroté ${x.name} (nom non numérique refusé par Civil 3D) ; no du monument en description`,t:tNow});
@@ -1450,6 +1458,7 @@ function run(){
   S.lines=A.lines;S.issues=A.issues;S.cmds=A.cmds||[];
   for(const r of S.rows) if(r.calc&&!r.calc.zOk&&!r.del) S.issues.push({sev:'warn',row:r.i,kind:'zcheck',msg:`Élévation du point calculé à confirmer : Z = ${r.xyz[2]} par défaut (${r.calc.kind}).`});
   checkNumbering();
+  {const U=unusedRefs();if(U.length)S.issues.push({sev:'info',row:U[0].i,kind:'purge',msg:`${U.length} point(s) importé(s) non utilisé(s) (coordonnées saisies ou importées, ni mesurés, ni implantés, ni utilisés dans un calcul) : ${U.slice(0,6).map(r=>r.name).join(', ')}${U.length>6?' …':''}. Ils alourdissent le levé et peuvent être retirés.`})}
   // élément circulaire (ex. 231 Puisard circulaire) levé en ligne de 2-3 points sans .6 : proposer le cercle
   {const circ=S.lines.filter(L=>L.type==='line'&&!L.closed&&L.pts.length>=2&&L.pts.length<=3&&/circulaire/i.test((CODES.get(L.pcode)||{}).desc||''));
     for(const L of circ)S.issues.push({sev:'info',row:L.pts[0],kind:'circ',line:L,all:circ,msg:`${L.pcode} ${(CODES.get(L.pcode)||{}).abr||''} / string ${L.str} : élément circulaire levé par ${L.pts.length} points en ligne. Le dessiner en cercle (.6) ?`});}
@@ -1486,6 +1495,7 @@ function undoEntry(h){
   else if(h.type==='rename'){for(const s of h.items)s.r.name=s.name;if(S.renumLog&&h.renEnt){const q=S.renumLog.indexOf(h.renEnt);if(q>=0)S.renumLog.splice(q,1)}S.journal.push({name:'Numérotation',before:'',after:'',why:'Annulation de la renumérotation',t:new Date().toLocaleString('fr-CA')});}
   else if(h.type==='snap'){const F=h.fields||['desc','xyz'];for(const s of h.items){if(F.includes('desc'))s.r.desc=s.st.desc;if(F.includes('xyz')){for(const k of ['e','n','z','bad','hi','swapNote'])s.r[k]=s.st[k];s.r.xyz=s.st.xyz.slice()}}if(h.hiEnt&&S.hiLog){const q=S.hiLog.indexOf(h.hiEnt);if(q>=0)S.hiLog.splice(q,1)}S.journal.push({name:h.label,before:'',after:'',why:'Annulation',t:new Date().toLocaleString('fr-CA')});}
   else if(h.type==='add'){const k=S.rows.indexOf(h.r);if(k>=0)S.rows.splice(k,1);if(h.cPrev!=null)h.C.desc=h.cPrev;reindex();if(S.sel!=null&&!S.rows[S.sel])S.sel=null;S.journal.push({name:h.r.name,before:'',after:'',why:'Point calculé retiré',t:new Date().toLocaleString('fr-CA')});}
+  else if(h.type==='purge'){for(const it of h.items)S.rows.splice(Math.min(it.idx,S.rows.length),0,it.r);reindex();S.journal.push({name:h.label,before:'',after:'',why:'Annulation : points importés remis dans le levé',t:new Date().toLocaleString('fr-CA')});}
   else if(h.type==='reorder'){const rows=h.oldOrder;const slots=rows.map(r=>S.rows.indexOf(r)).filter(i=>i>=0).sort((a,b)=>a-b);
     if(slots.length===rows.length)slots.forEach((x,k)=>S.rows[x]=rows[k]);for(const s of h.items){s.r.name=s.name;s.r.desc=s.st.desc}reindex();
     if(S.renumLog&&h.renEnt){const q=S.renumLog.indexOf(h.renEnt);if(q>=0)S.renumLog.splice(q,1)}S.journal.push({name:h.label,before:'',after:'',why:'Annulation de la renumérotation de la ligne',t:new Date().toLocaleString('fr-CA')});}
@@ -1495,8 +1505,8 @@ function undoEntry(h){
 /* ---------- Historique : annuler une correction précise ----------
    Une correction plus ancienne peut être annulée seule si aucune correction plus récente ne touche les mêmes points
    (mêmes données) ; sinon les corrections liées sont annulées avec elle (on le dit avant). */
-function histRows(h){switch(h.type){case 'desc':case 'del':return [h.r];case 'swap':return [h.A,h.B];case 'add':return [h.r,h.C].filter(Boolean);case 'calc':return [h.r,...h.items.map(s=>s.r)];case 'snap':case 'rename':case 'reorder':return h.items.map(s=>s.r)}return []}
-function histFields(h){if(h.fields)return h.fields;if(h.type==='reorder')return ['name','desc','xyz'];return h.type==='del'?['del']:h.type==='rename'?['name']:h.type==='desc'?['desc']:['desc','xyz']}
+function histRows(h){switch(h.type){case 'desc':case 'del':return [h.r];case 'swap':return [h.A,h.B];case 'add':return [h.r,h.C].filter(Boolean);case 'calc':return [h.r,...h.items.map(s=>s.r)];case 'snap':case 'rename':case 'reorder':case 'purge':return h.items.map(s=>s.r)}return []}
+function histFields(h){if(h.fields)return h.fields;if(h.type==='reorder')return ['name','desc','xyz'];if(h.type==='purge')return ['del','name','desc','xyz'];return h.type==='del'?['del']:h.type==='rename'?['name']:h.type==='desc'?['desc']:['desc','xyz']}
 function histDeps(k){const rows=new Set(histRows(S.hist[k])),f=new Set(histFields(S.hist[k])),out=[];
   for(let j=k+1;j<S.hist.length;j++){const h=S.hist[j];const hf=histFields(h);if(hf.some(x=>f.has(x))&&histRows(h).some(r=>rows.has(r))){out.push(j);histRows(h).forEach(r=>rows.add(r));hf.forEach(x=>f.add(x))}}return out}
 function undoSelect(k){const idx=[k,...histDeps(k)].sort((a,b)=>b-a);const lab=S.hist[k].why||'correction';
@@ -1546,7 +1556,7 @@ function sessEntry(force){
     for(const k of ['del','hi','swapNote','bad'])if(r[k]!=null)o[k]=r[k];
     if(r.calc){const c=r.calc;o.calc=Object.assign({},c,{refs:(c.refs||[]).map(x=>typeof x==='number'?x:idx.get(x)).filter(x=>x!=null)})}
     return o});
-  return {key:S.sessKey,name:S.fileName,enc:S.enc,t:Date.now(),n:nMod,text:S.srcText,rows,journal:S.journal,renumLog:S.renumLog||[],hiLog:S.hiLog||[]};
+  return {key:S.sessKey,name:S.fileName,enc:S.enc,t:Date.now(),n:nMod,text:S.srcText,rows,journal:S.journal,renumLog:S.renumLog||[],hiLog:S.hiLog||[],repTitle:S.repTitle||'',repNote:S.repNote||''};
 }
 /* Fichier de séance : même contenu que la sauvegarde automatique + analyses ajoutées au rapport */
 function sessFileName(){return S.fileName.replace(/\.[^.]+$/,'')+'_seance.json'}
@@ -1567,7 +1577,7 @@ function sessRestore(ent){
       Object.assign(r,{name:o.name,desc:o.desc,xyz:o.xyz.slice(),e:o.e,n:o.n,z:o.z});
       for(const k of ['del','hi','swapNote','bad'])if(o[k]!=null)r[k]=o[k];return r});
     ent.rows.forEach((o,k)=>{if(o.calc)rows[k].calc=Object.assign({},o.calc,{refs:o.calc.refs.map(j=>rows[j]).filter(Boolean)})});
-    S.rows=rows;S.F.rows=rows;reindex();S.journal=ent.journal||[];S.renumLog=ent.renumLog||[];S.hiLog=ent.hiLog||[];S.hist=[];S.sel=null;
+    S.rows=rows;S.F.rows=rows;reindex();S.journal=ent.journal||[];S.renumLog=ent.renumLog||[];S.hiLog=ent.hiLog||[];S.repTitle=ent.repTitle||'';S.repNote=ent.repNote||'';S.hist=[];S.sel=null;
     S.journal.push({name:'Séance',before:'',after:'',why:`Séance d'édition reprise (sauvegarde du ${new Date(ent.t).toLocaleString('fr-CA')})`,t:new Date().toLocaleString('fr-CA')});
   }finally{S.restoring=false}
   run();fit();$('fname').textContent=ent.name+' · '+S.rows.length+' points';
@@ -1808,8 +1818,18 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&S.tool){S.tool=null
 
 /* correctifs proposés */
 function hasKey(i,k){return !!linkOf(i,k)}
+/* Points importés (origine Local) qui ne servent à rien dans ce levé : aucune mesure / implantation / calcul / paire de calibration */
+function unusedRefs(){const used=new Set();for(const r of S.rows){if(r.del)continue;if(r.ctl&&r.ctl!=='ref'&&r.mon)used.add(r.mon.toLowerCase());if(r.calc)for(const x of r.calc.refs||[])if(x&&x.name)used.add((x.mon||x.name).toLowerCase())}
+  const C=typeof calCurrent==='function'?calCurrent():null;for(const p of (C&&C.pairs)||[])used.add(String(p.known).toLowerCase());
+  return S.rows.filter(r=>r.ctl==='ref'&&!r.del&&!used.has((r.mon||r.name).toLowerCase()))}
+function purgeRefs(){const U=unusedRefs();if(!U.length)return;const now=new Date().toLocaleString('fr-CA');
+  const items=U.map(r=>({r,idx:S.rows.indexOf(r)})).sort((a,b)=>b.idx-a.idx);for(const it of items)S.rows.splice(it.idx,1);reindex();
+  S.hist.push({type:'purge',items:items.slice().reverse(),label:`${U.length} point(s) importé(s) retiré(s)`});
+  for(const r of U)S.journal.push({name:r.name,before:`${r.xyz.join(' ')}`,after:'',why:'Point importé non utilisé retiré du levé (ni mesuré, ni implanté, ni utilisé dans un calcul)',t:now});
+  S.purgeAsk=false;S.sel=null;run();toast(`${U.length} point(s) importé(s) retiré(s). Annuler ou Historique pour les remettre.`)}
 function fixesFor(is){
   const r=S.rows[is.row],out=[];const k=is.key;
+  if(is.kind==='purge'){const n=unusedRefs().length;out.push(S.purgeAsk?{label:`Confirmer : retirer ${n} point(s) (annulable)`,fn:purgeRefs,open:true}:{label:`Retirer les ${n} point(s) importé(s) non utilisé(s)…`,fn:()=>{S.purgeAsk=true;run();toast('Touchez « Confirmer » pour retirer ces points (Annuler les remet).')},open:true});return out}
   if(is.kind==='single'){
     let prev=-1,next=-1;
     for(let j=is.row-1;j>=0;j--) if(hasKey(j,k)){prev=j;break}
@@ -2775,7 +2795,8 @@ $('bDxf').onclick=()=>{if(numGate())return;
   if(errs)toast(`DXF produit avec ${errs} erreur(s) non corrigée(s) : ces points sont dessinés sans liaison.`);
 };
 $('bJournal').onclick=()=>{const f=csvFile();save(f.name,f.data)};
-$('bRep').onclick=()=>{$('repFrame').srcdoc=reportHTML();$('repSheet').hidden=false;phRefresh();calNote()};
+$('bRep').onclick=()=>{$('repT').value=S.repTitle||'';$('repC').value=S.repNote||'';$('repFrame').srcdoc=reportHTML();$('repSheet').hidden=false;phRefresh();calNote()};
+{let tm=null;const upd=()=>{S.repTitle=$('repT').value.trim();S.repNote=$('repC').value.replace(/\s+$/,'');clearTimeout(tm);tm=setTimeout(()=>{$('repFrame').srcdoc=reportHTML();sessSchedule()},500)};$('repT').oninput=upd;$('repC').oninput=upd}
 $('repClose').onclick=()=>{$('repSheet').hidden=true};
 /* ---------- Calibration de site (localisation) Emlid Flow 360 : texte copié des pages « Informations sur le système de coordonnées » et « Points de localisation » ---------- */
 function calParse(txt){
@@ -2919,7 +2940,7 @@ function reportHTML(){
   const ant=uniq(meas.map(r=>{const h=hiOf(r);return h==null?null:h.toFixed(3)+' m'}));
   const baseC=uniq(gnss.map(r=>M(r,'Base easting')?`E ${M(r,'Base easting')} · N ${M(r,'Base northing')} · Z ${M(r,'Base elevation')}`:null));
   const n={err:0,warn:0,info:0};S.issues.forEach(i=>{if(i.sev in n)n[i.sev]++});
-  const calc=rows.filter(r=>r.added);const refs=rows.filter(r=>r.ctl==='ref');const cals=rows.filter(r=>r.ctl==='cal');
+  const calc=rows.filter(r=>r.added);const refsAll=rows.filter(r=>r.ctl==='ref'),refs=refsAll.filter(r=>!r.design),dsg=refsAll.filter(r=>r.design);const cals=rows.filter(r=>r.ctl==='cal');
   const calSec=refs.length&&(cals.length||(S.F&&S.F.fmt==='Emlid'));const knownSet=new Set(refs.map(r=>(r.mon||'').toLowerCase()));
   // avec une calibration de site, toutes les mesures des points connus (levé et _stkd) vont dans la section Calibration
   const calM=calSec?rows.filter(r=>(r.ctl==='cal'||r.ctl==='stkd')&&knownSet.has((r.mon||'').toLowerCase())):cals;
@@ -2950,7 +2971,7 @@ ${kv('Bibliothèque de codes',e(ti['Nom de bibliothèque']||''))}
     if(R){const dE=r.e-R.e,dN=r.n-R.n,dZ=r.z-R.z,dH=Math.hypot(dE,dN);flag=dH>tolC||(!R.noZ&&Math.abs(dZ)>tolC)?' class="out"':'';d=`<td>${f3(dE)}</td><td>${f3(dN)}</td><td><b>${f3(dH)}</b></td><td>${R.noZ?'<span class="na">—</span>':f3(dZ)}</td>`+(R.ctl!=='ref'?'':'')}
     const c=CODES.get(parseDesc(r.desc).pcode);
     return `<tr${flag}><td class="m">${e(r.mon)}</td><td class="m">${e(r.name)}</td><td class="m">${e(r.fieldName)}</td><td>${e(parseDesc(r.desc).pcode||'')}${c?' '+e(c.abr):''}</td>${d}<td>${e(hm(M(r,'Averaging start')))}</td></tr>`});
-  const html=`<!doctype html><html lang="fr-CA"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Rapport de levé ${e(base())}</title>
+  const html=`<!doctype html><html lang="fr-CA"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${e(S.repTitle||'Rapport de levé')} ${e(base())}</title>
 <style>
 :root{--ink:#18232a;--mut:#5d6b73;--line:#d5dde1;--acc:#0e6f66;--err:#c4302b;--warn:#a86400;--bg:#fff}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.45 "Segoe UI",Barlow,Arial,sans-serif}
@@ -2971,7 +2992,8 @@ tr.out td{background:#fdecea}.small td,.small th{font-size:11px;padding:2px 5px}
 @media print{main{padding:0;max-width:none}h2{break-after:avoid}tr{break-inside:avoid}@page{margin:14mm}}
 @media (max-width:560px){.grid{grid-template-columns:1fr}.k{margin-top:6px}}
 </style></head><body><main>
-<header><div style="display:flex;align-items:center;gap:14px"><span style="display:flex;gap:10px;align-items:center"><img src="${AN_LOGO}" alt="Arpent-Nord construction" style="height:58px;width:auto"><img src="${MT_LOGO}" alt="MECATECH Arpentage" style="height:52px;width:auto"></span><h1>Rapport de levé<small>${e(S.fileName)}${S.F&&S.F.fmt?' · format '+e(S.F.fmt):''}</small></h1></div><div class="gen">Produit le ${e(gen)}<br>Validation de levé ArpentNord</div></header>
+<header><div style="display:flex;align-items:center;gap:14px"><span style="display:flex;gap:10px;align-items:center"><img src="${AN_LOGO}" alt="Arpent-Nord construction" style="height:58px;width:auto"><img src="${MT_LOGO}" alt="MECATECH Arpentage" style="height:52px;width:auto"></span><h1>${e(S.repTitle||'Rapport de levé')}<small>${e(S.fileName)}${S.F&&S.F.fmt?' · format '+e(S.F.fmt):''}</small></h1></div><div class="gen">Produit le ${e(gen)}<br>Validation de levé ArpentNord</div></header>
+${S.repNote?sec('Commentaires',`<p style="white-space:pre-wrap">${e(S.repNote)}</p>`):''}
 ${sec('Identification',`<div class="grid">
 ${kv('Date du levé',times.length?e(uniq(times.map(day)).join(', ')):(tb&&tb.date?e(tb.date):(S.F&&S.F.leica&&S.F.leica.date?e(S.F.leica.date):null)))}
 ${kv('Heures',times.length?`${e(hm(times[0]))} à ${e(hm(tEnd[tEnd.length-1]||times[times.length-1]))}`:null,tz?e(tz):'')}
@@ -3028,8 +3050,8 @@ ${calSec?sec('Points connus contrôlés',(()=>{
   const C=calCurrent(),csN=calCsName(),pairSet=new Set(((C&&C.pairs)||[]).map(p=>String(p.known).toLowerCase()));
   return `<p><b>${used.length} point(s) connu(s) contrôlé(s) pendant le levé</b>${used.length?' : '+used.map(K=>e(K.mon)+(pairSet.has((K.mon||'').toLowerCase())?' <span class="sub">(paire de calibration)</span>':'')).join(', '):''} — ${refs.length} point(s) connu(s) dans le fichier.${!C&&/calibr|locali/i.test(csN)?` <b style="color:#a86400">Le système « ${e(csN.replace(/\s*\+.*$/,''))} » est déterminé par une calibration de site : ses paires et paramètres ne sont pas dans l'export CSV ; joignez-les avec « Calibration de site (Emlid)… » dans la fenêtre du rapport.</b>`:''}</p>${tbl(['Point connu','E connu','N connu','Z connu','Point mesuré','ΔE','ΔN','ΔH','ΔZ','Date et heure'],trs)}
 <p class="note">Points connus : lignes d'origine « Local » de l'export Emlid (coordonnées saisies, non mesurées) ; ils ne sont pas comptés comme points levés ni exportés dans le _modif${$('oRef').checked?' (sauf option « exporter les références »)':''}. Mesures associées par le no du monument (description du point ou nom _stkd). Écarts = mesuré − connu ; ligne surlignée au-delà de ${tolC.toFixed(3)} m. Z connu = 0,000 : pas d'élévation connue, contrôle horizontal seulement. ${calCurrent()?'Paires et paramètres de la calibration : voir la section « Calibration de site ».':'Les paires et paramètres d\'une calibration de site ne figurent pas dans l\'export CSV.'}</p>`})()):''}
-${sec('Implantation et contrôle',`${tbl(['Monument','Matricule','Nom au terrain','Code','ΔE','ΔN','ΔH','ΔZ','Heure'],ctlRows)}
-<p class="note">Écarts = mesuré − référence. Ligne surlignée : écart horizontal ou vertical au-delà de ${tolC.toFixed(3)} m. Les points mesurés prennent le prochain matricule libre à la fin du levé ; le no du monument est inscrit en description.${refs.length?` Coordonnées de référence : ${refs.map(r=>`${e(r.mon)} (E ${f3(r.e)} · N ${f3(r.n)} · Z ${f3(r.z)})`).join(' ; ')} — ${$('oRef').checked?'exportées':'non exportées'} dans le _modif.`:''}</p>`)}
+${sec('Implantation et contrôle',`${tbl(['Référence','Matricule','Nom au terrain','Code','ΔE','ΔN','ΔH','ΔZ','Heure'],ctlRows)}
+<p class="note">Écarts = mesuré − référence. Ligne surlignée : écart horizontal ou vertical au-delà de ${tolC.toFixed(3)} m. Les points mesurés prennent le prochain matricule libre à la fin du levé ; le no du monument est inscrit en description.${(calSec?dsg:refsAll).length?` Coordonnées de référence : ${(calSec?dsg:refsAll).map(r=>`${e(r.mon)} (E ${f3(r.e)} · N ${f3(r.n)} · Z ${f3(r.z)})${r.design?' <span class="sub">point de conception saisi au terrain</span>':''}`).join(' ; ')} — ${$('oRef').checked?'exportées':'non exportées'} dans le _modif.`:''}</p>`)}
 ${sec('Points calculés',tbl(['Matricule','Calcul','Points de référence','E','N','Z','Élévation','Description'],calc.map(r=>{const c=r.calc||{};const refsN=(c.refs||[]).map(x=>x&&x.name?x.name:(S.rows[x]||{}).name).filter(Boolean);
   return `<tr${c.zOk===false?' class="out"':''}><td class="m">${e(r.name)}</td><td>${e(c.kind||'')}</td><td class="m">${e(refsN.join(', '))}</td><td>${e(r.xyz[0])}</td><td>${e(r.xyz[1])}</td><td>${e(r.xyz[2])}</td><td>${c.zOk===false?'à confirmer':'confirmée'}</td><td class="m">${descOf(r)}</td></tr>`})))}
 ${sec('Corrections apportées',tbl(['Matricule','Avant','Après','Motif','Heure'],S.journal.map(j=>`<tr><td class="m">${e(j.name)}</td><td class="m">${e(j.before)}</td><td class="m">${e(j.after)}</td><td>${e(j.why)}</td><td>${e(j.t)}</td></tr>`),'small'))}
