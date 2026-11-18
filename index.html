@@ -343,7 +343,7 @@ tr.hion td{background:color-mix(in srgb,#ffc440 18%,transparent)}
             <code>3C</code><span>Centre du cercle par 3 points (2D). Avec <code>.6</code> sur le 1<sup>er</sup> point (<code>231 1.6_3C</code>, puis <code>231 1_3C</code>) : le cercle est dessiné et son centre calculé (ex. Z d’un radier à inscrire)</span>
             <code>RECT</code><span>4<sup>e</sup> point d'un rectangle (3 points, coin au milieu)</span>
           </div>
-          <p class="note">Le point créé prend le prochain numéro libre, le code des points utilisés avec l'attribut CALCUL, et est inséré après le dernier point utilisé. Les commandes sont retirées des descriptions dans le _modif. Pour les fonctions 2D, l'élévation est la moyenne des points ; elle se change dans la fiche du point (moyenne, un point ou une valeur).</p>
+          <p class="note">Le point créé prend le prochain numéro libre et le code <b>300 PCB</b> (point calculé au bureau) avec l'attribut CALCUL et le code des points utilisés (ex. « 300 CALCUL 526 ») ; s'il continue une ligne, il garde le code et le string de la ligne (« 526 2 CALCUL »). Il est inséré après le dernier point utilisé. Les commandes sont retirées des descriptions dans le _modif. Pour les fonctions 2D, l'élévation est la moyenne des points ; elle se change dans la fiche du point (moyenne, un point ou une valeur).</p>
           <h3>Codes de contrôle (string Leica CS20)</h3>
           <div class="legend">
             <code>.1</code><span>Début de ligne</span>
@@ -356,7 +356,7 @@ tr.hion td{background:color-mix(in srgb,#ffc440 18%,transparent)}
             <code>_</code><span>Liaison multiple sur un même point : <code>526 1.2_2.1</code> ferme le string 1 et débute le string 2 ; <code>181 1_186 1.1</code> continue le 181 et débute le 186 (double Pcode). Autant de liaisons que voulu.</span>
           </div>
           <p class="note">Format lu&nbsp;: <code>Matricule,Est,Nord,Élév,Description</code> où la description est <code>Pcode String.Contrôle [attributs]</code>, ex. <code>526 1.1</code>. Le fichier _modif est toujours écrit au format <code>P,N,E,Z,D</code> (Point, Nord, Est, Élév., Description), sans ligne d'en-tête, quel que soit le format lu. Il contient les descriptions corrigées, les coordonnées des points inversés et les points calculés (rectangle), insérés juste après le dernier point de leur ligne.</p>
-          <p class="note">Version v9.9-2026-11-18 · fonctionne hors ligne une fois ouverte · les fichiers restent sur l'appareil.</p>
+          <p class="note">Version v9.10-2026-11-18 · fonctionne hors ligne une fois ouverte · les fichiers restent sur l'appareil.</p>
           <div class="actions"><button class="btn sm" id="bJournal" type="button" disabled>Exporter le journal des corrections (.csv)</button><button class="btn sm" id="bResetLay" type="button">Rétablir les couches du gabarit</button></div>
         </div>
       </div>
@@ -1038,7 +1038,7 @@ function analyze(rows,codes,opt){
   }
   /* sauts de numérotation */
   // les points calculés (ajoutés ou attribut CALCUL) sont hors séquence : on ne les compte pas
-  const seqRows=rows.filter(r=>/^\d+$/.test(r.name)&&!r.added&&!r.ctl&&!(r.p&&r.p.attrs&&r.p.attrs.includes('CALCUL'))).sort((a,b)=>(+a.name)-(+b.name)); // ordre numérique (certains exports, ex. FRT Leica, regroupent les points par ligne)
+  const seqRows=rows.filter(r=>/^\d+$/.test(r.name)&&!r.added&&!r.ctl&&!(r.p&&r.p.attrs&&r.p.attrs.some(a=>/^\*?CALCUL$/i.test(a)))).sort((a,b)=>(+a.name)-(+b.name)); // ordre numérique (certains exports, ex. FRT Leica, regroupent les points par ligne)
   const used=new Set(rows.map(r=>r.name));
   for(let k=1;k<seqRows.length;k++){
     const a=+seqRows[k-1].name,b=+seqRows[k].name;
@@ -1166,8 +1166,18 @@ function swapPoints(A,B,withDesc){
 }
 function rowLine(r,delim){const f=r.fields.slice(0,r.cols.d);f[r.cols.name]=r.name;f[r.cols.e]=r.xyz[0];f[r.cols.n]=r.xyz[1];f[r.cols.z]=r.xyz[2];f.push(r.desc);return f.join(delim)}
 /* Fichier _modif : format ArpentNord P,N,E,Z,D (Point, Nord, Est, Élév, Description), sans en-tête, quel que soit le format lu */
+/* Civil 3D (gabarit ArpentNord) : tout ce qui suit le code et la liaison est précédé de « * »
+   (« 526 2.1 Conteneur » → « 526 2.1 *Conteneur », « 700 118150B » → « 700 *118150B »). Le code seul définit le type de point / ligne. */
+function c3dDesc(d){
+  d=(d||'').trim();const p=parseDesc(d);
+  if(p.err||!p.pcode||!p.attrs||!p.attrs.length||/^\*/.test(p.attrs[0]))return d;
+  const head=formatDesc(Object.assign({},p,{attrs:[],cmdText:null}));
+  const at=p.attrs.join(' ');
+  if(d.startsWith(head+' '+at))return head+' *'+d.slice(head.length+1);
+  const q=Object.assign({},p,{attrs:p.attrs.slice()});q.attrs[0]='*'+q.attrs[0];return formatDesc(q);
+}
 function buildModifText(F,rows){
-  const out=rows.map(r=>[r.name,r.xyz[1],r.xyz[0],r.xyz[2],(r.desc||'').trim()].map(v=>(v==null?'':String(v).trim())).join(','));
+  const out=rows.map(r=>[r.name,r.xyz[1],r.xyz[0],r.xyz[2],c3dDesc(r.desc)].map(v=>(v==null?'':String(v).trim())).join(','));
   return out.join('\r\n')+'\r\n';
 }
 /* Nouveau point (calculé) inséré dans le fichier juste après « anchor », même format de nombres */
@@ -1181,7 +1191,7 @@ function rectFourth(A,B,C){
   const ang=Math.abs(Math.atan2((A.e-B.e)*(C.n-B.n)-(A.n-B.n)*(C.e-B.e),(A.e-B.e)*(C.e-B.e)+(A.n-B.n)*(C.n-B.n)))*180/Math.PI;
   return {e:A.e+C.e-B.e,n:A.n+C.n-B.n,z:A.z+C.z-B.z,ang,ab:Math.hypot(A.e-B.e,A.n-B.n),bc:Math.hypot(C.e-B.e,C.n-B.n)};
 }
-if(typeof module!=='undefined'&&module.exports) module.exports={parseLeicaFRT,parseTrimbleHTML,fieldCodeDesc,prepControl,parseFile,parseDesc,formatDesc,analyze,lineVerts,buildDXF,buildCodes,makeZip,toCp1252,buildModifText,crc32,swapPoints,isModified,makeRow,rectFourth,patchLinkDesc,splitCmd,calcCmd,CMD_NEED,addLinkDesc};
+if(typeof module!=='undefined'&&module.exports) module.exports={parseLeicaFRT,parseTrimbleHTML,fieldCodeDesc,prepControl,parseFile,parseDesc,formatDesc,analyze,lineVerts,buildDXF,buildCodes,makeZip,toCp1252,buildModifText,c3dDesc,crc32,swapPoints,isModified,makeRow,rectFourth,patchLinkDesc,splitCmd,calcCmd,CMD_NEED,addLinkDesc};
 
 /* ===== Codes hors standard → liste ArpentNord =====
    Lit tous les codes d'un levé qui ne respectent pas « Pcode String.Contrôle », les regroupe
@@ -1876,7 +1886,8 @@ $('bNext').onclick=()=>nav(1);$('bPrev').onclick=()=>nav(-1);$('fInfo').onchange
 /* Élévation d'un point calculé : Z calculé (fonctions 3D), moyenne des points de référence,
    Z d'un point de référence, Z transféré d'un autre point (matricule) ou valeur manuelle.
    Disponible pour tout point calculé (créé ici, ou portant l'attribut CALCUL dans un fichier rouvert). */
-function isCalcRow(r){return !!r.calc||parseDesc(r.desc).attrs.includes('CALCUL')}
+const isCalcAttr=a=>/^\*?CALCUL$/i.test(a);
+function isCalcRow(r){if(r.calc)return true;const p=parseDesc(r.desc);return CALC_CODES.has(String(p.pcode))||p.attrs.some(isCalcAttr)}
 function zPanel(r){
   if(!isCalcRow(r))return '';
   const c=r.calc,refs=c?c.refs:[];
@@ -1899,7 +1910,8 @@ function calcLinePanel(r){const Ls=calcLineOpts(r);if(!Ls.length)return '';const
     <div class="note">Le point peut continuer la ligne de provenance (même code et string) ; il est dessiné à sa place dans l'ordre du levé.</div>`}
 function calcLineSet(r,key){const Ls=calcLineOpts(r);const keys=new Set(Ls.map(L=>L.key));let p=parseDesc(r.desc);
   let d=r.desc;for(const l of p.links)if(keys.has(l.pcode+'|'+l.str))d=patchLinkDesc(d,l.pcode+'|'+l.str,()=>null);
-  if(key){const L=Ls.find(x=>x.key===key);const q=parseDesc(d);d=q.links.length?addLinkDesc(d,{pcode:L.pcode,str:L.str,ctrl:null}):formatDesc({pcode:L.pcode,str:L.str,ctrl:null,attrs:q.attrs,cmdText:q.cmdText});}
+  if(key){const L=Ls.find(x=>x.key===key);const q=parseDesc(d);d=q.links.length?addLinkDesc(d,{pcode:L.pcode,str:L.str,ctrl:null}):formatDesc({pcode:L.pcode,str:L.str,ctrl:null,attrs:['CALCUL'],cmdText:q.cmdText});}
+  else if(!parseDesc(d).links.length&&r.calc&&r.calc.refs)d=calcDesc(r.calc.refs); // point seul → 300 CALCUL <code>
   setDesc(r.i,d,key?`Point calculé rattaché à la ligne ${key.replace('|',' / ')}`:'Point calculé détaché de sa ligne');}
 function zPanelBind(r){
   if(!$('iZm'))return;
@@ -2516,9 +2528,12 @@ function calcToolRender(bar){
   $('tbClose').onclick=()=>{S.tool=null;re()};
   $('tbGo').onclick=()=>{const refs=t.picks.map(i=>S.rows[i]);createCalc(t.kind,refs,null,calcOpts(t),false);S.tool={...t,picks:[]};re()};
 }
-/* Code du point calculé : Pcode des points utilisés (le plus fréquent, sinon le 1er) + attribut CALCUL */
-function calcDesc(refs){const cnt=new Map();for(const r of refs){const p=parseDesc(r.desc);if(p.pcode)cnt.set(p.pcode,(cnt.get(p.pcode)||0)+1)}
-  const best=[...cnt.entries()].sort((a,b)=>b[1]-a[1])[0];return (best?best[0]+' ':'')+'CALCUL'}
+/* Code du point calculé hors ligne : 300 PCB « point calculé dans le bureau » (299 PCT = calculé au terrain),
+   attribut CALCUL + Pcode des points utilisés (le plus fréquent) pour savoir ce qu'il représente : « 300 CALCUL 526 ».
+   Un point calculé qui fait partie d'une liaison garde le code de la ligne : « 526 2 CALCUL ». */
+const CALC_CODES=new Set(['299','300','301']);
+function calcDesc(refs){const cnt=new Map();for(const r of refs){const p=parseDesc(r.desc);if(p.pcode&&!CALC_CODES.has(p.pcode))cnt.set(p.pcode,(cnt.get(p.pcode)||0)+1)}
+  const best=[...cnt.entries()].sort((a,b)=>b[1]-a[1])[0];return '300 CALCUL'+(best?' '+best[0]:'')}
 function createCalc(kind,refs,vals,opts,fromCmd){
   // Z = 0 par défaut pour tout point calculé : l'utilisateur confirme ensuite l'élévation voulue
   opts=Object.assign({},opts);if(opts.zSel==null){opts.zSel='zero';opts.zMode='val';opts.zVal=0;}
