@@ -112,6 +112,7 @@ Un guide illustré est disponible : `guide.html` (bouton Documentation de la Bo�
 | v9.9 | 2026-11-18 | Lignes tracées dans Emlid (code « 526_2 », Control code CLS) reprises d'office en liaisons ArpentNord |
 | v9.10 | 2026-11-18 | _modif.txt : « * » devant tout ce qui suit le code et la liaison (gabarit Civil 3D) ; point calculé hors ligne = code 300 PCB (« 300 CALCUL 526 »), dans une ligne = code de la ligne + CALCUL |
 | v9.11 | 2026-11-18 | EFFACER LIAISONS : « Lignes choisies sur le plan… » (toucher les lignes à effacer, en rouge) |
+| v9.12 | 2026-11-18 | LIER 2 PTS : points du même code liés en une seule ligne (même string), reprise du string existant d'un point (ex. 385 5), fermeture en retouchant le 1er point |
 
 ## 9. Responsables
 
