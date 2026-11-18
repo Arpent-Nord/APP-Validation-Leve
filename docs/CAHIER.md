@@ -84,7 +84,7 @@ Un guide illustré est disponible : `guide.html` (bouton Documentation de la Bo�
   - débordement : cuvette dont le niveau dépasse la frontière / limite à ne pas franchir ; **revanche** = limite − niveau d'eau ;
   - écoulement : sens, pente la plus faible et contre-pentes (> 1 cm) sur la ligne du centre (69 FOC par défaut) ; **pente moyenne du fossé = moyenne des pentes du centre et des bords** (70 FOB ou 65 FOF), avertissement si un bord s'écarte de plus de 0,10 % ;
   - résultats indicatifs, à confirmer dans Civil 3D au besoin.
-- **Sortie `_modif` :** toujours `P,N,E,Z,D`, virgule, CRLF, sans ligne d'en-tête, quel que soit le format lu ; points effacés et références exclus.
+- **Sortie `_modif` :** toujours `P,N,E,Z,D`, virgule, CRLF, sans ligne d'en-tête, quel que soit le format lu ; points effacés et références exclus ; points calculés par l'app : code **300** PCB s'ils ne font partie d'aucune liaison (`300 *CALCUL 526`, 526 = code des points utilisés ; 299 PCT = calculé au terrain), sinon code et string de la ligne (`526 2 *CALCUL`) ; description : `Pcode String.Contrôle *attributs` (ex. `526 2.1 *Conteneur`) — le « * » précède tout ce qui suit le code et la liaison, le code seul définit le type de point / ligne du gabarit Civil 3D.
 
 ## 7. Limites connues et pistes d'amélioration
 
@@ -110,6 +110,7 @@ Un guide illustré est disponible : `guide.html` (bouton Documentation de la Bo�
 | v9.7.1 | 2026-11-17 | Points connus Emlid (Local) non exportés ni comptés ; dépôt renommé APP-Validation-Leve |
 | v9.8 | 2026-11-17 | Calibration de site Emlid jointe au rapport (paires, résidus, paramètres) ; section « Points connus contrôlés » |
 | v9.9 | 2026-11-18 | Lignes tracées dans Emlid (code « 526_2 », Control code CLS) reprises d'office en liaisons ArpentNord |
+| v9.10 | 2026-11-18 | _modif.txt : « * » devant tout ce qui suit le code et la liaison (gabarit Civil 3D) ; point calculé hors ligne = code 300 PCB (« 300 CALCUL 526 »), dans une ligne = code de la ligne + CALCUL |
 
 ## 9. Responsables
 
