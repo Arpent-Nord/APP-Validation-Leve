@@ -356,7 +356,7 @@ tr.hion td{background:color-mix(in srgb,#ffc440 18%,transparent)}
             <code>_</code><span>Liaison multiple sur un même point : <code>526 1.2_2.1</code> ferme le string 1 et débute le string 2 ; <code>181 1_186 1.1</code> continue le 181 et débute le 186 (double Pcode). Autant de liaisons que voulu.</span>
           </div>
           <p class="note">Format lu&nbsp;: <code>Matricule,Est,Nord,Élév,Description</code> où la description est <code>Pcode String.Contrôle [attributs]</code>, ex. <code>526 1.1</code>. Le fichier _modif est toujours écrit au format <code>P,N,E,Z,D</code> (Point, Nord, Est, Élév., Description), sans ligne d'en-tête, quel que soit le format lu. Il contient les descriptions corrigées, les coordonnées des points inversés et les points calculés (rectangle), insérés juste après le dernier point de leur ligne.</p>
-          <p class="note">Version v9.14-2026-11-18 · fonctionne hors ligne une fois ouverte · les fichiers restent sur l'appareil.</p>
+          <p class="note">Version v9.15-2026-11-18 · fonctionne hors ligne une fois ouverte · les fichiers restent sur l'appareil.</p>
           <div class="actions"><button class="btn sm" id="bJournal" type="button" disabled>Exporter le journal des corrections (.csv)</button><button class="btn sm" id="bResetLay" type="button">Rétablir les couches du gabarit</button></div>
         </div>
       </div>
@@ -403,7 +403,7 @@ tr.hion td{background:color-mix(in srgb,#ffc440 18%,transparent)}
     <div class="field"><label for="repC">Commentaires (paraissent au début du rapport)</label><textarea id="repC" rows="2" placeholder="ex. Implantation d'un bouton poussoir sur le trottoir existant. Une marque au feutre indique ce point, voir les photos ci-dessous."></textarea></div>
     <iframe id="repFrame" title="Aperçu du rapport"></iframe>
     <div class="actions" style="justify-content:flex-start"><button class="btn" id="calOpen" type="button">Calibration de site (Emlid)…</button><span class="note" id="calN"></span><label class="btn filebtn">Ajouter des photos du terrain…<input type="file" id="phIn" accept="image/*" multiple></label><span class="note" id="phN"></span></div>
-    <div id="phList" style="display:flex;gap:8px;flex-wrap:wrap;max-height:9.5em;overflow:auto"></div>
+    <div id="phList" style="display:flex;gap:8px;flex-wrap:wrap;max-height:12.5em;overflow:auto;flex-shrink:0"></div>
     <div class="actions"><button class="btn primary" id="repSave" type="button">Enregistrer _rapport.html</button><button class="btn" id="repPrint" type="button">Imprimer / PDF</button><button class="btn" id="repClose" type="button">Fermer</button></div>
   </div>
 </div>
@@ -2847,15 +2847,16 @@ $('calClear').onclick=()=>{const c=calCurrent();S.calib=null;if(c){const m=LS.ge
 /* ---------- Photos du terrain (rapport) : réduites à 1600 px, gardées dans la séance ---------- */
 S.photos=S.photos||[];
 function phRefresh(){const L=S.photos;$('phN').textContent=L.length?`${L.length} photo(s) au rapport`:'aucune photo';
-  $('phList').innerHTML=L.map((p,k)=>`<div style="width:150px;font-size:12px"><img src="${p.url}" alt="" style="width:150px;height:100px;object-fit:cover;border-radius:4px;border:1px solid var(--line)"><input data-k="${k}" class="phCap" value="${esc(p.cap||'')}" placeholder="légende" style="width:100%;font-size:12px"><button class="btn sm phDel" data-k="${k}" type="button" style="margin-top:2px">Retirer</button></div>`).join('');
+  $('phList').innerHTML=L.map((p,k)=>`<div style="width:150px;font-size:12px"><img src="${p.url}" alt="" style="width:150px;height:72px;object-fit:cover;border-radius:4px;border:1px solid var(--line)"><input data-k="${k}" class="phCap" value="${esc(p.cap||'')}" placeholder="légende" style="width:100%;font-size:12px"><select data-k="${k}" class="phSz" title="Taille de la photo au rapport" style="width:100%;font-size:12px;margin-top:2px">${[['s','Petite'],['m','Moyenne'],['l','Pleine largeur']].map(([v,l])=>`<option value="${v}" ${(p.size||'s')===v?'selected':''}>${l}</option>`).join('')}</select><button class="btn sm phDel" data-k="${k}" type="button" style="margin-top:2px">Retirer</button></div>`).join('');
   $('phList').querySelectorAll('.phCap').forEach(x=>x.onchange=()=>{S.photos[+x.dataset.k].cap=x.value;$('repFrame').srcdoc=reportHTML();sessSchedule()});
+  $('phList').querySelectorAll('.phSz').forEach(x=>x.onchange=()=>{S.photos[+x.dataset.k].size=x.value;$('repFrame').srcdoc=reportHTML();sessSchedule()});
   $('phList').querySelectorAll('.phDel').forEach(x=>x.onclick=()=>{S.photos.splice(+x.dataset.k,1);phRefresh();$('repFrame').srcdoc=reportHTML();sessSchedule()})}
 $('phIn').onchange=async e=>{const fs=[...e.target.files];e.target.value='';let n=0;
   for(const f of fs){try{const bm=await createImageBitmap(f);const k=Math.min(1,1600/Math.max(bm.width,bm.height));const c=document.createElement('canvas');c.width=Math.round(bm.width*k);c.height=Math.round(bm.height*k);c.getContext('2d').drawImage(bm,0,0,c.width,c.height);
     S.photos.push({url:c.toDataURL('image/jpeg',.82),cap:f.name.replace(/\.[^.]+$/,''),t:new Date(f.lastModified||Date.now()).toLocaleString('fr-CA'),name:f.name});n++}catch(err){toast(`${f.name} : image non lisible.`)}}
   phRefresh();$('repFrame').srcdoc=reportHTML();if(n)toast(`${n} photo(s) ajoutée(s) au rapport.`);if(n&&S.hist)sessFileSave&&sessFileSave()};
 function repPhotoSec(e,sec){const L=S.photos||[];if(!L.length)return '';
-  return sec('Photos du terrain',`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:10px">${L.map((p,k)=>`<figure style="margin:0;break-inside:avoid"><img src="${p.url}" alt="${e(p.cap||'')}" style="width:100%;border:1px solid #d5dde1;border-radius:4px"><figcaption class="note"><b>Photo ${k+1}</b>${p.cap?' — '+e(p.cap):''}${p.t?` · ${e(p.t)}`:''}</figcaption></figure>`).join('')}</div>`)}
+  return sec('Photos du terrain',`<div class="phg" style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px">${L.map((p,k)=>`<figure style="margin:0;break-inside:avoid;grid-column:span ${({s:2,m:3,l:6})[p.size||'s']}"><img src="${p.url}" alt="${e(p.cap||'')}" style="width:100%;border:1px solid #d5dde1;border-radius:4px"><figcaption class="note"><b>Photo ${k+1}</b>${p.cap?' — '+e(p.cap):''}${p.t?` · ${e(p.t)}`:''}</figcaption></figure>`).join('')}</div>`)}
 $('repSave').onclick=()=>{const f=repFile();save(f.name,f.data)};
 $('repPrint').onclick=()=>{try{$('repFrame').contentWindow.focus();$('repFrame').contentWindow.print()}catch(e){toast('Impression bloquée ici : enregistrez le rapport puis ouvrez-le pour l\'imprimer.')}};
 
@@ -2990,6 +2991,7 @@ th{background:#eef3f4;font-weight:600}td.m,.m{font-family:Consolas,"JetBrains Mo
 tr.out td{background:#fdecea}.small td,.small th{font-size:11px;padding:2px 5px}
 .note{color:var(--mut);font-size:12px}
 @media print{main{padding:0;max-width:none}h2{break-after:avoid}tr{break-inside:avoid}@page{margin:14mm}}
+@media (max-width:640px){.phg figure{grid-column:span 6!important}}
 @media (max-width:560px){.grid{grid-template-columns:1fr}.k{margin-top:6px}}
 </style></head><body><main>
 <header><div style="display:flex;align-items:center;gap:14px"><span style="display:flex;gap:10px;align-items:center"><img src="${AN_LOGO}" alt="Arpent-Nord construction" style="height:58px;width:auto"><img src="${MT_LOGO}" alt="MECATECH Arpentage" style="height:52px;width:auto"></span><h1>${e(S.repTitle||'Rapport de levé')}<small>${e(S.fileName)}${S.F&&S.F.fmt?' · format '+e(S.F.fmt):''}</small></h1></div><div class="gen">Produit le ${e(gen)}<br>Validation de levé ArpentNord</div></header>
