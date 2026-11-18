@@ -356,7 +356,7 @@ tr.hion td{background:color-mix(in srgb,#ffc440 18%,transparent)}
             <code>_</code><span>Liaison multiple sur un même point : <code>526 1.2_2.1</code> ferme le string 1 et débute le string 2 ; <code>181 1_186 1.1</code> continue le 181 et débute le 186 (double Pcode). Autant de liaisons que voulu.</span>
           </div>
           <p class="note">Format lu&nbsp;: <code>Matricule,Est,Nord,Élév,Description</code> où la description est <code>Pcode String.Contrôle [attributs]</code>, ex. <code>526 1.1</code>. Le fichier _modif est toujours écrit au format <code>P,N,E,Z,D</code> (Point, Nord, Est, Élév., Description), sans ligne d'en-tête, quel que soit le format lu. Il contient les descriptions corrigées, les coordonnées des points inversés et les points calculés (rectangle), insérés juste après le dernier point de leur ligne.</p>
-          <p class="note">Version v9.8-2026-11-17 · fonctionne hors ligne une fois ouverte · les fichiers restent sur l'appareil.</p>
+          <p class="note">Version v9.9-2026-11-18 · fonctionne hors ligne une fois ouverte · les fichiers restent sur l'appareil.</p>
           <div class="actions"><button class="btn sm" id="bJournal" type="button" disabled>Exporter le journal des corrections (.csv)</button><button class="btn sm" id="bResetLay" type="button">Rétablir les couches du gabarit</button></div>
         </div>
       </div>
@@ -527,7 +527,7 @@ function splitLine(line,delim){
 /* Export Emlid (Code + Description) → description ArpentNord « Pcode String.Contrôle[_commande] ».
    Code « 185_1 » : le « _1 » est le numéro de ligne ajouté par Emlid (repris seulement si la description n'a pas de string).
    Description « 1.1-4P », « 1-2PD-4.45 », « 2D-2.0 », « 63 1.1 » (Pcode d'une autre ligne → « 9_63 1.1 »). */
-function fieldCodeDesc(code,d){
+function fieldCodeDesc(code,d,ctl){
   code=(code||'').trim();d=(d||'').trim();
   const m=/^(\d{1,4})(?:_(\d+))?$/.exec(code);
   const pc=m?m[1]:code,sfx=m&&m[2]?m[2]:null;
@@ -535,10 +535,12 @@ function fieldCodeDesc(code,d){
   if(cm){cmd=d.slice(cm.index+cm[1].length).trim().replace(/[-\s_]+(?=[+-]?\d)/g,'_').replace(/\s+/g,'_');cmd=cmd.replace(/^(2PD|2P|2D|3PP|4P|3C|RECT)/i,s=>s.toUpperCase());d=d.slice(0,cm.index).trim();}
   d=d.replace(/[-_]+$/,'').trim();
   let out;const lm=/^(\d{1,4})\s+(\S+)(.*)$/.exec(d);
+  // code « 526_2 » (Emlid, code de type ligne) : 526 = Pcode, 2 = no de la ligne → string 2 (.1 au 1er point, .2 à la fermeture)
+  const lk=sfx?pc+' '+sfx+(ctl?'.'+ctl:''):pc;
   if(!pc) out=d;
-  else if(!d) out=sfx&&!cmd?pc+' '+sfx:pc;
+  else if(!d) out=lk;
   else if(lm&&/^\d+(?:\.\d*)?$/.test(lm[2])) out=lm[1]===pc?d:pc+'_'+d;
-  else out=pc+' '+d;
+  else out=lk+' '+d;
   return cmd?(out?out+'_'+cmd:cmd):out;
 }
 
@@ -594,6 +596,14 @@ function parseFile(text){
     const xyz=[f[cols.e],f[cols.n],f[cols.z]].map(v=>(v||'').trim());
     rows.push({i:rows.length,li,raw,fields:f,cols,name:(f[cols.name]||'').trim(),e,n,z:isFinite(z)?z:0,xyz,oxyz:xyz.slice(),desc:desc??'',orig:desc??'',field,meta,bad:!(isFinite(e)&&isFinite(n))});
   });
+  // lignes tracées au terrain (Emlid : code « 526_2 » = 2e ligne du code 526, points dans l'ordre de la ligne ; Control code CLS = figure fermée)
+  if(hmap&&hmap.code!=null){const seen=new Set();
+    for(const r of rows){if(!r.field)continue;const m=/^(\d{1,4})_(\d+)$/.exec(r.field.code);if(!m)continue;const k=m[1]+'|'+m[2];
+      let c=null;if(!seen.has(k)){seen.add(k);c='1'}
+      const cc=String(r.meta&&(r.meta['Control code']||r.meta['control code'])||'').trim().toUpperCase();
+      if(/^(CLS|CLOSE|CL)$/.test(cc))c=c==='1'?'1':'2';
+      if(c){r.desc=r.orig=fieldCodeDesc(r.field.code,r.field.desc,c)}
+      r.fline=k;}}
   const renamed=prepControl(rows);
   return {eol,endsWithEol,lines,delim,header,rows,fmt:hmap&&hmap.fmt||null,hmap,renamed,comments};
 }
