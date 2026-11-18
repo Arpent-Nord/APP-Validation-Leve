@@ -26,7 +26,7 @@
    - **Annuler**, **Historique** (annuler une correction précise).
 6. **ANALYSE** (facultatif) : analyse d'un fossé entre deux points (eau accumulée, débordement, sens et pente d'écoulement) → « Ajouter au rapport ».
 7. **Fond** (facultatif) : orthophoto du projet (image + fichier de référence) ou imagerie en ligne.
-8. **Rapport** : aperçu, **calibration de site Emlid** (coller le texte des pages Flow 360 « Informations sur le système de coordonnées » et « Points de localisation »), ajout de photos du terrain, « Enregistrer _rapport.html » ou « Imprimer / PDF ».
+8. **Rapport** : titre et commentaires modifiables (repris au début du rapport et gardés dans la séance), aperçu, **calibration de site Emlid** (coller le texte des pages Flow 360 « Informations sur le système de coordonnées » et « Points de localisation »), ajout de photos du terrain, « Enregistrer _rapport.html » ou « Imprimer / PDF ».
 9. **Exporter _modif.txt** et **Exporter DXF** ; **Envoyer par Outlook…** au besoin.
 10. **Sauvegarder la séance** pour reprendre plus tard (ou sur un autre poste) : le fichier `_seance.json` se rouvre avec « Ouvrir un levé… ». Une sauvegarde automatique est aussi gardée dans le navigateur (5 derniers levés).
 
@@ -37,7 +37,7 @@ Un guide illustré est disponible : `guide.html` (bouton Documentation de la Bo�
 | Élément | Format | Détails |
 |---|---|---|
 | Levé texte ArpentNord / Leica | `P,N,E,Z,D` ou `P,E,N,Z,D` (virgule, point-virgule, tabulation ou espace) | ordre N/E détecté sur les valeurs ; lignes `#` (PROJET, DATE, OPÉRATEUR) lues |
-| Levé Emlid Flow | CSV « tout sélectionner » (Code + Description + qualité GNSS) | origine **Local** = point connu (calibration / contrôle) ; `_stkd` = implantation ; code de type ligne « 526_2 » = Pcode 526, string 2 (.1 au 1er point, `CLS` = fermeture .2) |
+| Levé Emlid Flow | CSV « tout sélectionner » (Code + Description + qualité GNSS) | origine **Local** = point connu : monument (no du type 312371A ou code monument / repère) → « Points connus contrôlés » ; sinon point de conception saisi au terrain (BOUTON, LIGNE1) → « Implantation et contrôle » ; points importés non utilisés retirables (anomalie, confirmation, Annuler) ; `_stkd` = implantation ; code de type ligne « 526_2 » = Pcode 526, string 2 (.1 au 1er point, `CLS` = fermeture .2) |
 | Levé Leica CS20 | rapport « RAPPORT D'ARPENTAGE » (FRT) | strings, fermetures, points connus |
 | Levé Trimble Access | rapport HTML (.htm) | stations, résiduels, implantations |
 | Fichier de tiers / logiciel | CSV avec noms non numériques | renumérotés, nom d'origine au journal |
@@ -114,6 +114,7 @@ Un guide illustré est disponible : `guide.html` (bouton Documentation de la Bo�
 | v9.11 | 2026-11-18 | EFFACER LIAISONS : « Lignes choisies sur le plan… » (toucher les lignes à effacer, en rouge) |
 | v9.12 | 2026-11-18 | LIER 2 PTS : points du même code liés en une seule ligne (même string), reprise du string existant d'un point (ex. 385 5), fermeture en retouchant le 1er point |
 | v9.13 | 2026-11-18 | LIER 2 PTS en liaison libre : la ligne suit l'ordre touché ; à la fin, renumérotation proposée (mêmes numéros redistribués dans l'ordre de la ligne, rows replacées), bloquée si une autre ligne ou commande changerait d'ordre ; journal, rapport, Annuler |
+| v9.14 | 2026-11-18 | Implantation sans point numéroté (BOUTON, LIGNE1) : points de conception distingués des monuments, _stkd au standard date ; retrait (confirmé, annulable) des points importés non utilisés ; titre et commentaires du rapport |
 
 ## 9. Responsables
 
