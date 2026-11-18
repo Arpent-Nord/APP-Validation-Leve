@@ -356,7 +356,7 @@ tr.hion td{background:color-mix(in srgb,#ffc440 18%,transparent)}
             <code>_</code><span>Liaison multiple sur un même point : <code>526 1.2_2.1</code> ferme le string 1 et débute le string 2 ; <code>181 1_186 1.1</code> continue le 181 et débute le 186 (double Pcode). Autant de liaisons que voulu.</span>
           </div>
           <p class="note">Format lu&nbsp;: <code>Matricule,Est,Nord,Élév,Description</code> où la description est <code>Pcode String.Contrôle [attributs]</code>, ex. <code>526 1.1</code>. Le fichier _modif est toujours écrit au format <code>P,N,E,Z,D</code> (Point, Nord, Est, Élév., Description), sans ligne d'en-tête, quel que soit le format lu. Il contient les descriptions corrigées, les coordonnées des points inversés et les points calculés (rectangle), insérés juste après le dernier point de leur ligne.</p>
-          <p class="note">Version v9.12-2026-11-18 · fonctionne hors ligne une fois ouverte · les fichiers restent sur l'appareil.</p>
+          <p class="note">Version v9.13-2026-11-18 · fonctionne hors ligne une fois ouverte · les fichiers restent sur l'appareil.</p>
           <div class="actions"><button class="btn sm" id="bJournal" type="button" disabled>Exporter le journal des corrections (.csv)</button><button class="btn sm" id="bResetLay" type="button">Rétablir les couches du gabarit</button></div>
         </div>
       </div>
@@ -1486,14 +1486,17 @@ function undoEntry(h){
   else if(h.type==='rename'){for(const s of h.items)s.r.name=s.name;if(S.renumLog&&h.renEnt){const q=S.renumLog.indexOf(h.renEnt);if(q>=0)S.renumLog.splice(q,1)}S.journal.push({name:'Numérotation',before:'',after:'',why:'Annulation de la renumérotation',t:new Date().toLocaleString('fr-CA')});}
   else if(h.type==='snap'){const F=h.fields||['desc','xyz'];for(const s of h.items){if(F.includes('desc'))s.r.desc=s.st.desc;if(F.includes('xyz')){for(const k of ['e','n','z','bad','hi','swapNote'])s.r[k]=s.st[k];s.r.xyz=s.st.xyz.slice()}}if(h.hiEnt&&S.hiLog){const q=S.hiLog.indexOf(h.hiEnt);if(q>=0)S.hiLog.splice(q,1)}S.journal.push({name:h.label,before:'',after:'',why:'Annulation',t:new Date().toLocaleString('fr-CA')});}
   else if(h.type==='add'){const k=S.rows.indexOf(h.r);if(k>=0)S.rows.splice(k,1);if(h.cPrev!=null)h.C.desc=h.cPrev;reindex();if(S.sel!=null&&!S.rows[S.sel])S.sel=null;S.journal.push({name:h.r.name,before:'',after:'',why:'Point calculé retiré',t:new Date().toLocaleString('fr-CA')});}
+  else if(h.type==='reorder'){const rows=h.oldOrder;const slots=rows.map(r=>S.rows.indexOf(r)).filter(i=>i>=0).sort((a,b)=>a-b);
+    if(slots.length===rows.length)slots.forEach((x,k)=>S.rows[x]=rows[k]);for(const s of h.items){s.r.name=s.name;s.r.desc=s.st.desc}reindex();
+    if(S.renumLog&&h.renEnt){const q=S.renumLog.indexOf(h.renEnt);if(q>=0)S.renumLog.splice(q,1)}S.journal.push({name:h.label,before:'',after:'',why:'Annulation de la renumérotation de la ligne',t:new Date().toLocaleString('fr-CA')});}
   else if(h.type==='swap'){const A=h.A,B=h.B;swapPoints(A,B,h.withDesc);A.swapNote=h.notes[0];B.swapNote=h.notes[1];S.journal.push({name:A.name+' ↔ '+B.name,before:'',after:'',why:'Annulation de l\'inversion',t:new Date().toLocaleString('fr-CA')});}
   else{h.r.desc=h.before;S.journal.push({name:h.r.name,before:'',after:h.before,why:'Annulation',t:new Date().toLocaleString('fr-CA')});}
 }
 /* ---------- Historique : annuler une correction précise ----------
    Une correction plus ancienne peut être annulée seule si aucune correction plus récente ne touche les mêmes points
    (mêmes données) ; sinon les corrections liées sont annulées avec elle (on le dit avant). */
-function histRows(h){switch(h.type){case 'desc':case 'del':return [h.r];case 'swap':return [h.A,h.B];case 'add':return [h.r,h.C].filter(Boolean);case 'calc':return [h.r,...h.items.map(s=>s.r)];case 'snap':case 'rename':return h.items.map(s=>s.r)}return []}
-function histFields(h){if(h.fields)return h.fields;return h.type==='del'?['del']:h.type==='rename'?['name']:h.type==='desc'?['desc']:['desc','xyz']}
+function histRows(h){switch(h.type){case 'desc':case 'del':return [h.r];case 'swap':return [h.A,h.B];case 'add':return [h.r,h.C].filter(Boolean);case 'calc':return [h.r,...h.items.map(s=>s.r)];case 'snap':case 'rename':case 'reorder':return h.items.map(s=>s.r)}return []}
+function histFields(h){if(h.fields)return h.fields;if(h.type==='reorder')return ['name','desc','xyz'];return h.type==='del'?['del']:h.type==='rename'?['name']:h.type==='desc'?['desc']:['desc','xyz']}
 function histDeps(k){const rows=new Set(histRows(S.hist[k])),f=new Set(histFields(S.hist[k])),out=[];
   for(let j=k+1;j<S.hist.length;j++){const h=S.hist[j];const hf=histFields(h);if(hf.some(x=>f.has(x))&&histRows(h).some(r=>rows.has(r))){out.push(j);histRows(h).forEach(r=>rows.add(r));hf.forEach(x=>f.add(x))}}return out}
 function undoSelect(k){const idx=[k,...histDeps(k)].sort((a,b)=>b-a);const lab=S.hist[k].why||'correction';
@@ -2078,6 +2081,7 @@ function toolRender(){
   bar.classList.toggle('ana',S.tool.kind==='ana');
   if(S.tool.kind==='ana'){anaRender(bar);return}
   if(S.tool.kind==='ulpick'){ulPickRender(bar);return}
+  if(S.tool.kind==='renum'){renumRender(bar);return}
   if(CMD_NEED[S.tool.kind]&&S.tool.kind!=='RECT'){calcToolRender(bar);return}
   const t=S.tool,n=t.picks.map(i=>S.rows[i].name);bar.hidden=false;
   let msg,ok=false,extra='';
@@ -2130,8 +2134,10 @@ function toolRender(){
         extra=`<div class="tbrow" style="flex-direction:column;align-items:flex-start">${opts.map((o,k)=>`<label><input type="radio" name="tbOpt" value="${k}" ${k===t.opt?'checked':''}> ${o.txt}</label>`).join('')}</div>`;}
     }
     {const c=t.lc&&CODES.get(t.lc);
+     const rnHint=t.cl&&renumPlan(t.cl).need?` <span class="pill warn">ordre touché ≠ ordre des numéros : renumérotation proposée à la fin de la ligne</span>`:'';
      if(!t.lc&&t.auto&&t.cl&&n.length===1)msg=`Ligne <b>${esc(t.auto)} / ${esc(t.cl.str)}</b> (${t.cl.pts.length} points) depuis <b class="mono">${esc(n[0])}</b> : touchez le point suivant, la ligne continue sous le même string. Touchez le 1<sup>er</sup> point pour fermer la figure ; « Terminer » pour finir.`;
      if(t.lc&&n.length<2)msg=c?(t.cl&&n.length===1?`Liaison en code <b>${esc(t.lc)} ${esc(c.abr)}</b> (string ${esc(t.cl.str)}, ${t.cl.pts.length} points) depuis <b class="mono">${esc(n[0])}</b> : touchez le point suivant. Touchez le 1<sup>er</sup> point pour fermer la zone ; « Terminer » pour finir.`:`Liaison en code <b>${esc(t.lc)} ${esc(c.abr)}</b> · ${esc(c.desc)} : touchez le 1<sup>er</sup> point, puis les suivants. Les liaisons existantes des points sont gardées (double liaison).`):`<span style="color:var(--err)">Code ${esc(t.lc)} absent de la liste ArpentNord.</span>`;
+     if(rnHint)msg+=rnHint;
      extra+=`<div class="tbrow"><label class="note" for="tbLc">Code de la liaison (facultatif, ex. 290 pour une zone d'empierrement) :</label><input id="tbLc" class="mono" list="codeList" inputmode="numeric" style="width:6.5em" value="${esc(t.lc||'')}" placeholder="code des points"></div>`;}
   } else if(t.kind==='close'){
     if(n.length<2) msg=`Fermer / rattacher : touchez les 2 points à relier (${n.length}/2)${n.length?' · <b class="mono">'+esc(n[0])+'</b>':''}.`;
@@ -2174,9 +2180,9 @@ function toolRender(){
   bar.querySelectorAll('input[name=tbPc]').forEach(r=>r.onchange=()=>{t.pc=r.value;toolRender();draw()});
   bar.querySelectorAll('input[name=tbOpt]').forEach(r=>r.onchange=()=>{t.opt=+r.value;t.prevLine=null;draw()});
   bar.querySelectorAll('[data-cand]').forEach(btn=>btn.onclick=()=>{const cands=S.lines.filter(l=>l.type==='line'&&l.pts.includes(t.picks[0]));t.line=cands[+btn.dataset.cand];toolRender();draw()});
-  $('tbReset').onclick=()=>{t.picks=[];t.chain=false;t.cl=null;S.rectPrev=null;toolRender();draw()};
+  $('tbReset').onclick=()=>{if(t.kind==='link'&&linkEnd(t,{kind:'link',picks:[],lc:t.lc}))return;t.picks=[];t.chain=false;t.cl=null;S.rectPrev=null;toolRender();draw()};
   if($('tbLc'))$('tbLc').onchange=()=>{const v=$('tbLc').value.trim();t.lc=v||null;S.lastLc=t.lc;t.cl=null;t.chain=false;if(t.picks.length>1)t.picks=t.picks.slice(-1);toolRender();draw()};
-  $('tbClose').onclick=()=>{S.tool=null;toolRender();draw()};
+  $('tbClose').onclick=()=>{if(t.kind==='link'&&linkEnd(t,null))return;S.tool=null;toolRender();draw()};
   $('tbGo').onclick=()=>{
     if(t.kind==='close'||t.kind==='link'||t.kind==='cut'){const o=t.opts[t.opt];const nxt=t.kind==='link'?t.picks[1]:null;o.fn();S.tool={kind:t.kind,picks:nxt!=null&&S.rows[nxt]?[nxt]:[],chain:nxt!=null};toolRender();draw();return}
     if(t.kind==='hi'){if(applyHi(t)){S.tool={kind:'hi',picks:[]};}toolRender();draw();return}
@@ -2198,13 +2204,15 @@ function linkExisting(pc,i){const l=parseDesc(S.rows[i].desc).links.find(x=>x.pc
 function linkWithCode(t){
   const pc=t.lc||t.auto;if(!CODES.get(pc)){toast(`Code ${pc} absent de la liste ArpentNord.`);t.picks=t.picks.slice(-1);toolRender();draw();return}
   const [a,b]=t.picks;
-  if(!t.cl||t.cl.pc!==pc||!t.cl.pts.includes(a))t.cl=linkExisting(pc,a)||{pc,str:freeStrings(pc,1)[0],pts:[a],closed:false,start:a,fresh:true};
+  if(!t.cl||t.cl.pc!==pc||!t.cl.pts.includes(a)){const ex=linkExisting(pc,a);
+    if(ex){const rs=ex.pts.map(i=>S.rows[i]);ex.seq=a===ex.pts[ex.pts.length-1]?rs:a===ex.pts[0]?rs.slice().reverse():null;if(ex.closed)ex.seq=null}
+    t.cl=ex||{pc,str:freeStrings(pc,1)[0],pts:[a],closed:false,start:a,fresh:true,seq:[S.rows[a]]};}
   const cl=t.cl;let closing=false;
   if(cl.pts.includes(b)){if(cl.pts.length>=3&&!cl.closed&&(b===Math.min(...cl.pts)||b===cl.start)){closing=true;cl.closed=true}else{toast(cl.closed?'La figure est déjà fermée.':'Ce point est déjà dans la figure.');t.picks=[a];toolRender();draw();return}}
   else{// point d'une ligne d'un seul point du même code (ex. « 385 5.1 ») : il est repris dans la ligne ; si la ligne vient d'être commencée, elle prend son numéro
     const ex=linkExisting(pc,b);let old=null;cl.bSnap={r:S.rows[b],st:snapState(S.rows[b])};
     if(ex&&ex.str!==cl.str&&ex.pts.length===1){S.rows[b].desc=patchLinkDesc(S.rows[b].desc,pc+'|'+ex.str,()=>null);if(cl.fresh){old=pc+'|'+cl.str;cl.str=ex.str;cl.fresh=false}}
-    cl.pts.push(b);cl.old=old}
+    cl.pts.push(b);cl.old=old;if(cl.seq)cl.seq.push(S.rows[b])}
   const pts=cl.pts.slice().sort((x,y)=>x-y),key=pc+'|'+cl.str;
   const items=pts.map(i=>cl.bSnap&&cl.bSnap.r===S.rows[i]?cl.bSnap:({r:S.rows[i],st:snapState(S.rows[i])}));cl.bSnap=null;
   pts.forEach((i,k)=>{const r=S.rows[i];let d=patchLinkDesc(r.desc,key,()=>null);if(cl.old)d=patchLinkDesc(d,cl.old,()=>null);
@@ -2212,10 +2220,63 @@ function linkWithCode(t){
   S.hist.push({type:'snap',items,fields:['desc'],label:key});
   S.journal.push({name:`${S.rows[a].name} → ${S.rows[b].name}`,before:'',after:pts.map(i=>S.rows[i].desc).join(' / '),why:`Liaison ajoutée en code ${pc} / string ${cl.str}${closing?' (zone fermée)':''}, en plus des liaisons existantes`,t:new Date().toLocaleString('fr-CA')});
   run();
-  if(closing){S.tool={kind:'link',picks:[],lc:t.lc};toast(`Zone ${pc} / ${cl.str} fermée (${pts.length} points).`)}
+  if(closing){toast(`Zone ${pc} / ${cl.str} fermée (${pts.length} points).`);if(linkEnd(t,{kind:'link',picks:[],lc:t.lc}))return;S.tool={kind:'link',picks:[],lc:t.lc}}
   else S.tool={kind:'link',picks:[b],chain:true,lc:t.lc,auto:t.lc?undefined:pc,cl};
   toolRender();draw();
 }
+/* ---------- Liaison libre : la ligne suit l'ordre où les points sont touchés ----------
+   À la fin de la ligne (Terminer, Recommencer, fermeture), si l'ordre touché ne suit pas l'ordre des numéros,
+   l'app propose de redistribuer les numéros de ces points (les mêmes numéros, dans l'ordre de la ligne) et de les
+   replacer dans cet ordre dans le fichier. Points connus, implantations et points calculés gardent leur numéro.
+   Bloqué si une autre ligne ou une commande terrain passant par ces points changerait d'ordre. */
+const incr=a=>a.every((v,k)=>!k||v>a[k-1]);
+function renumEligible(r){return /^\d+$/.test(r.name)&&!r.ctl&&!r.calc&&!r.added&&!r.del}
+function renumTry(order,cl){
+  const key=cl.pc+'|'+cl.str;
+  const elig=order.filter(renumEligible),fixed=order.filter(r=>!renumEligible(r));
+  const slots=elig.map(r=>S.rows.indexOf(r)).sort((a,b)=>a-b),names=slots.map(i=>S.rows[i].name);
+  const arr=S.rows.slice();slots.forEach((x,k)=>arr[x]=elig[k]);
+  const moves=elig.map((r,k)=>({r,old:r.name,nw:names[k]})).filter(m=>m.old!==m.nw);
+  const chainOk=incr(order.map(r=>arr.indexOf(r)));
+  const moved=new Set(moves.map(m=>m.r)),conf=[],keys=new Set();
+  for(const r of moved)for(const l of parseDesc(r.desc).links){const k=l.pcode+'|'+l.str;if(k!==key)keys.add(k)}
+  for(const k of keys){const has=r=>parseDesc(r.desc).links.some(l=>l.pcode+'|'+l.str===k);const A=S.rows.filter(has),B=arr.filter(has);if(A.some((r,i)=>r!==B[i]))conf.push(`la ligne ${k.replace('|',' / ')}`)}
+  for(const g of S.cmds||[]){const rs=(g.refs||[]).map(i=>S.rows[i]).filter(Boolean);if(!rs.some(r=>moved.has(r)))continue;if(!incr(rs.map(r=>arr.indexOf(r))))conf.push(`la commande ${g.kind} (${rs.map(r=>r.name).join(', ')})`)}
+  return {need:true,order,elig,slots,names,moves,conf,chainOk,fixed,cl,key,score:conf.length*1e6+(chainOk?0:1e5)+moves.length};
+}
+function renumPlan(cl){
+  if(!cl||!cl.seq||cl.seq.length<3)return {need:false};
+  const seq=cl.seq.filter(r=>S.rows.includes(r)&&!r.del);if(seq.length<3)return {need:false};
+  const pos=seq.map(r=>S.rows.indexOf(r)),ok=a=>incr(a)||incr(a.slice().reverse());
+  if(ok(pos))return {need:false};
+  if(cl.closed)for(let k=1;k<pos.length;k++)if(ok(pos.slice(k).concat(pos.slice(0,k))))return {need:false};
+  const cands=[];for(const b of [seq,seq.slice().reverse()]){if(cl.closed)for(let k=0;k<b.length;k++)cands.push(b.slice(k).concat(b.slice(0,k)));else cands.push(b)}
+  let best=null;for(const c of cands){const P=renumTry(c,cl);if(!best||P.score<best.score)best=P}
+  return best;
+}
+/* fin d'une ligne liée en continu : proposer la renumérotation si nécessaire (sinon passer à l'état suivant) */
+function linkEnd(t,next){const P=t&&t.cl?renumPlan(t.cl):{need:false};
+  if(!P.need||!P.moves.length)return false;
+  S.tool={kind:'renum',picks:[],P,next};toolRender();draw();return true}
+function renumRender(bar){const P=S.tool.P;bar.hidden=false;const lab=P.key.replace('|',' / ');
+  const L=P.moves.slice(0,12).map(m=>`<b class="mono">${esc(m.old)}</b> → <b class="mono">${esc(m.nw)}</b>`).join(' · ')+(P.moves.length>12?` … (+${P.moves.length-12})`:'');
+  let msg=`La ligne <b>${esc(lab)}</b> a été touchée dans un autre ordre que les numéros des points. Pour qu'elle soit tracée dans cet ordre (pointillé orange), renuméroter ${P.moves.length} point(s) — mêmes numéros, redistribués dans l'ordre de la ligne :<br>${L}`;
+  if(!P.chainOk&&P.fixed.length)msg+=`<br><span class="pill warn">${P.fixed.map(r=>esc(r.name)).join(', ')} : point connu, implanté ou calculé, garde son numéro ; la ligne ne suivra pas tout à fait l'ordre touché.</span>`;
+  if(P.conf.length)msg+=`<br><span style="color:var(--err)">Renumérotation impossible : elle changerait l'ordre de ${P.conf.join(', ')}. Gardez les numéros ou corrigez d'abord cette ligne.</span>`;
+  bar.innerHTML=`<div class="tbmsg">${msg}</div><div class="actions"><button class="btn sm primary" id="rnGo" type="button" ${P.conf.length?'disabled':''}>Renuméroter (${P.moves.length})</button><button class="btn sm" id="rnNo" type="button">Garder les numéros</button></div>`;
+  $('rnGo').onclick=()=>{renumApply(P);S.tool=S.tool&&S.tool.kind==='renum'?S.tool.next:null;toolRender();draw()};
+  $('rnNo').onclick=()=>{S.tool=S.tool.next;toolRender();draw();toast('Numéros gardés : la ligne suit l\'ordre des numéros.')}}
+function renumApply(P){const now=new Date().toLocaleString('fr-CA'),key=P.key;
+  const hasK=r=>parseDesc(r.desc).links.some(l=>l.pcode+'|'+l.str===key);
+  const touch=new Set(P.elig.concat(S.rows.filter(hasK)));
+  const items=[...touch].map(r=>({r,name:r.name,st:snapState(r)}));
+  const oldOrder=P.slots.map(i=>S.rows[i]);
+  P.slots.forEach((x,k)=>{S.rows[x]=P.elig[k];P.elig[k].name=P.names[k]});reindex();
+  const rs=S.rows.filter(hasK);rs.forEach((r,k)=>{r.desc=patchLinkDesc(r.desc,key,l=>{l.ctrl=k===0?'1':(P.cl.closed&&k===rs.length-1?'2':null)})});
+  S.renumLog=S.renumLog||[];const renEnt={std:'L',what:`ligne ${key.replace('|',' / ')}`,map:P.moves.map(m=>[m.old,m.nw]),t:now};S.renumLog.push(renEnt);
+  S.hist.push({type:'reorder',items,oldOrder,renEnt,label:`Renumérotation ligne ${key.replace('|',' / ')}`});
+  for(const m of P.moves)S.journal.push({name:m.nw,before:m.old,after:m.nw,why:`Renuméroté pour suivre l'ordre de la ligne ${key.replace('|',' / ')} (ancien numéro ${m.old})`,t:now});
+  run();toast(`${P.moves.length} point(s) renuméroté(s) : la ligne ${key.replace('|',' / ')} suit l'ordre touché.`)}
 /* ===================== ANALYSE (v9.5) =====================
    Fossé : surface (TIN des points et des lignes retenus) entre 2 limites touchées,
    eau accumulée dans les cuvettes (remplissage des dépressions, sortie aux 2 limites),
@@ -2483,7 +2544,7 @@ function repPlanSec(e,sec){
 }
 
 function toolPick(i){
-  const t=S.tool,k=t.picks.indexOf(i);
+  const t=S.tool;if(t.kind==='renum')return;const k=t.picks.indexOf(i);
   if(t.kind==='ana'&&t.fpMode&&t.picks.length===2){t.fp=t.fp||[];const q=t.fp.indexOf(i);q>=0?t.fp.splice(q,1):t.fp.push(i);toolRender();draw();return}
   if(S.rows[i]&&S.rows[i].del&&k<0){toast(`Le point ${S.rows[i].name} est effacé : rétablissez-le d'abord (fiche du point).`);return}
   if(t.kind==='hi'&&k<0){t.excl=t.excl||new Set();const r=S.rows[i];if(t.excl.has(r)){t.excl.delete(r);toolRender();draw();return}if(hiSel(t).includes(r)){t.excl.add(r);toolRender();draw();return}}
@@ -2591,6 +2652,8 @@ function draw(){
   const selL=(S.tool?.kind==='close'||S.tool?.kind==='link'||S.tool?.kind==='cut')&&S.tool.opts&&S.tool.opts[S.tool.opt]?S.tool.opts[S.tool.opt].line:S.tool?.kind==='rev'&&S.tool.line?S.tool.line:(S.sel!=null?S.lineOf.get(S.sel):null);
   const DOFF=S.tool&&S.tool.kind==='ana'&&S.tool.off&&S.tool.off.size?S.tool.off:null;
   S.lines.forEach((L,k)=>{if(DOFF&&DOFF.has(String(L.pcode)))return;const v=S.verts[k];ctx.strokeStyle=colOfCode(L.pcode);ctx.lineWidth=L===selL?3:1.4;ctx.beginPath();v.forEach((p,j)=>{const [x,y]=W2S(p[0],p[1]);j?ctx.lineTo(x,y):ctx.moveTo(x,y)});ctx.stroke();});
+  {const T=S.tool;const sq=T&&T.kind==='link'&&T.cl&&T.cl.seq&&T.cl.seq.length>1?{seq:T.cl.seq,closed:T.cl.closed}:T&&T.kind==='renum'?{seq:T.P.order,closed:T.P.cl.closed}:null;
+    if(sq){ctx.save();ctx.setLineDash([7,5]);ctx.strokeStyle='#f5a524';ctx.lineWidth=2.5;ctx.beginPath();sq.seq.forEach((r,j)=>{const [x,y]=W2S(r.e,r.n);j?ctx.lineTo(x,y):ctx.moveTo(x,y)});if(sq.closed){const [x,y]=W2S(sq.seq[0].e,sq.seq[0].n);ctx.lineTo(x,y)}ctx.stroke();ctx.restore()}}
   if(S.tool&&S.tool.kind==='ulpick'&&S.tool.sel.size){ctx.strokeStyle='#e5484d';ctx.lineWidth=4;S.lines.forEach((L,k)=>{if(!S.tool.sel.has(ulId(L)))return;const v=S.verts[k];ctx.beginPath();v.forEach((p,j)=>{const [x,y]=W2S(p[0],p[1]);j?ctx.lineTo(x,y):ctx.moveTo(x,y)});if(v.length===1){const [x,y]=W2S(v[0][0],v[0][1]);ctx.arc(x,y,7,0,7)}ctx.stroke()})}
   try{anaDraw()}catch(e){console.error(e)}
   // points
@@ -2943,7 +3006,7 @@ ${kv('Observations par point',smp.length?`${Math.min(...smp)} à ${Math.max(...s
 <h3 class="note">Points hors tolérance ou sans solution FIX</h3>
 ${tbl(['Matricule','Statut','RMS H','RMS V','PDOP','Heure','Description'],bad.map(r=>`<tr class="out"><td class="m">${e(r.name)}</td><td>${e(M(r,'Solution status')||'')}</td><td>${e(M(r,'Lateral RMS')||'')}</td><td>${e(M(r,'Elevation RMS')||'')}</td><td>${e(M(r,'PDOP')||'')}</td><td>${e(hm(M(r,'Averaging start')))}</td><td class="m">${descOf(r)}</td></tr>`))}`):''}
 ${(S.hiLog||[]).length?sec('Corrections de hauteur d\'antenne / prisme',tbl(['Points','Nb','Hauteur au terrain','Bonne hauteur','ΔZ appliqué','Heure'],S.hiLog.map(h=>`<tr><td class="m">${e(h.first)}${h.n>1?' à '+e(h.last):''}</td><td>${h.n}</td><td>${h.groups.map(g=>g.old.toFixed(3)+' m ('+g.n+')').join(', ')}</td><td>${h.hNew.toFixed(3)} m</td><td>${h.groups.map(g=>(-(h.hNew-g.old)).toFixed(3)).join(' / ')} m</td><td>${e(h.t)}</td></tr>`))+'<p class="note">Z corrigé = Z au terrain − (bonne hauteur − hauteur au terrain).</p>'):''}
-${(S.renumLog||[]).length?sec('Renumérotation',S.renumLog.map(L=>`<p>Standard ArpentNord <b>${L.std==='J'?'jour julien AJJJSSNNN':'date AAMMJJNNNN'}</b> — ${L.map.length} point(s), ${e(L.t)}.</p>`+tbl(['Ancien','Nouveau'],L.map.map(([a,b])=>`<tr><td class="m">${e(a)}</td><td class="m">${e(b)}</td></tr>`),'small')).join('')):''}
+${(S.renumLog||[]).length?sec('Renumérotation',S.renumLog.map(L=>`<p>${L.std==='L'?`Ordre de la <b>${e(L.what)}</b> (liaison faite au bureau dans l'ordre des points)`:`Standard ArpentNord <b>${L.std==='J'?'jour julien AJJJSSNNN':'date AAMMJJNNNN'}</b>`} — ${L.map.length} point(s), ${e(L.t)}.</p>`+tbl(['Ancien','Nouveau'],L.map.map(([a,b])=>`<tr><td class="m">${e(a)}</td><td class="m">${e(b)}</td></tr>`),'small')).join('')):''}
 ${(()=>{const C=calCurrent();if(!C)return '';const tolV=+$('oTolV').value||.05;const P=C.params||{};
   const kn=new Set(refs.map(r=>(r.mon||'').toLowerCase()));
   const pr=C.pairs.map((p,k)=>`<tr${p.h>tolC||Math.abs(p.v)>tolV?' class="out"':''}><td>${k+1}</td><td class="m">${e(p.known)}${kn.has(String(p.known).toLowerCase())?' <span class="sub">· dans ce levé</span>':''}</td><td class="m">${e(p.meas)}</td><td>${p.h.toFixed(3)}</td><td>${p.v.toFixed(3)}</td></tr>`);
