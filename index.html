@@ -356,7 +356,7 @@ tr.hion td{background:color-mix(in srgb,#ffc440 18%,transparent)}
             <code>_</code><span>Liaison multiple sur un même point : <code>526 1.2_2.1</code> ferme le string 1 et débute le string 2 ; <code>181 1_186 1.1</code> continue le 181 et débute le 186 (double Pcode). Autant de liaisons que voulu.</span>
           </div>
           <p class="note">Format lu&nbsp;: <code>Matricule,Est,Nord,Élév,Description</code> où la description est <code>Pcode String.Contrôle [attributs]</code>, ex. <code>526 1.1</code>. Le fichier _modif est toujours écrit au format <code>P,N,E,Z,D</code> (Point, Nord, Est, Élév., Description), sans ligne d'en-tête, quel que soit le format lu. Il contient les descriptions corrigées, les coordonnées des points inversés et les points calculés (rectangle), insérés juste après le dernier point de leur ligne.</p>
-          <p class="note">Version v9.11-2026-11-18 · fonctionne hors ligne une fois ouverte · les fichiers restent sur l'appareil.</p>
+          <p class="note">Version v9.12-2026-11-18 · fonctionne hors ligne une fois ouverte · les fichiers restent sur l'appareil.</p>
           <div class="actions"><button class="btn sm" id="bJournal" type="button" disabled>Exporter le journal des corrections (.csv)</button><button class="btn sm" id="bResetLay" type="button">Rétablir les couches du gabarit</button></div>
         </div>
       </div>
@@ -2130,6 +2130,7 @@ function toolRender(){
         extra=`<div class="tbrow" style="flex-direction:column;align-items:flex-start">${opts.map((o,k)=>`<label><input type="radio" name="tbOpt" value="${k}" ${k===t.opt?'checked':''}> ${o.txt}</label>`).join('')}</div>`;}
     }
     {const c=t.lc&&CODES.get(t.lc);
+     if(!t.lc&&t.auto&&t.cl&&n.length===1)msg=`Ligne <b>${esc(t.auto)} / ${esc(t.cl.str)}</b> (${t.cl.pts.length} points) depuis <b class="mono">${esc(n[0])}</b> : touchez le point suivant, la ligne continue sous le même string. Touchez le 1<sup>er</sup> point pour fermer la figure ; « Terminer » pour finir.`;
      if(t.lc&&n.length<2)msg=c?(t.cl&&n.length===1?`Liaison en code <b>${esc(t.lc)} ${esc(c.abr)}</b> (string ${esc(t.cl.str)}, ${t.cl.pts.length} points) depuis <b class="mono">${esc(n[0])}</b> : touchez le point suivant. Touchez le 1<sup>er</sup> point pour fermer la zone ; « Terminer » pour finir.`:`Liaison en code <b>${esc(t.lc)} ${esc(c.abr)}</b> · ${esc(c.desc)} : touchez le 1<sup>er</sup> point, puis les suivants. Les liaisons existantes des points sont gardées (double liaison).`):`<span style="color:var(--err)">Code ${esc(t.lc)} absent de la liste ArpentNord.</span>`;
      extra+=`<div class="tbrow"><label class="note" for="tbLc">Code de la liaison (facultatif, ex. 290 pour une zone d'empierrement) :</label><input id="tbLc" class="mono" list="codeList" inputmode="numeric" style="width:6.5em" value="${esc(t.lc||'')}" placeholder="code des points"></div>`;}
   } else if(t.kind==='close'){
@@ -2188,22 +2189,31 @@ function toolRender(){
 }
 /* LIER avec un code choisi (ex. 290) : ajoute une liaison de ce code aux points touchés, en plus de leurs liaisons existantes.
    Les points de la figure sont repris dans l'ordre du levé : le 1er reçoit .1 ; toucher de nouveau le 1er point ferme la zone (.2 sur le dernier). */
+/* Ligne existante du code pc qui passe par le point i (string réutilisé : la ligne continue sous le même numéro) */
+function linkExisting(pc,i){const l=parseDesc(S.rows[i].desc).links.find(x=>x.pcode===pc&&(x.ctrl==null||x.ctrl==='1'||x.ctrl==='2'));if(!l)return null;
+  const key=pc+'|'+l.str,pts=[];let closed=false;
+  S.rows.forEach((r,k)=>{if(r.del)return;const q=parseDesc(r.desc).links.find(x=>x.pcode+'|'+x.str===key);if(q){pts.push(k);if(q.ctrl==='2')closed=true}});
+  if(pts.some(k=>parseDesc(S.rows[k].desc).links.some(x=>x.pcode+'|'+x.str===key&&x.ctrl!=null&&x.ctrl!=='1'&&x.ctrl!=='2')))return null;
+  return {pc,str:l.str,pts,closed,start:i}}
 function linkWithCode(t){
-  const pc=t.lc;if(!CODES.get(pc)){toast(`Code ${pc} absent de la liste ArpentNord.`);t.picks=t.picks.slice(-1);toolRender();draw();return}
+  const pc=t.lc||t.auto;if(!CODES.get(pc)){toast(`Code ${pc} absent de la liste ArpentNord.`);t.picks=t.picks.slice(-1);toolRender();draw();return}
   const [a,b]=t.picks;
-  if(!t.cl||!t.cl.pts.includes(a))t.cl={pc,str:freeStrings(pc,1)[0],pts:[a],closed:false};
+  if(!t.cl||t.cl.pc!==pc||!t.cl.pts.includes(a))t.cl=linkExisting(pc,a)||{pc,str:freeStrings(pc,1)[0],pts:[a],closed:false,start:a,fresh:true};
   const cl=t.cl;let closing=false;
-  if(cl.pts.includes(b)){if(cl.pts.length>=3&&b===Math.min(...cl.pts)){closing=true;cl.closed=true}else{toast('Ce point est déjà dans la figure.');t.picks=[a];toolRender();draw();return}}
-  else cl.pts.push(b);
+  if(cl.pts.includes(b)){if(cl.pts.length>=3&&!cl.closed&&(b===Math.min(...cl.pts)||b===cl.start)){closing=true;cl.closed=true}else{toast(cl.closed?'La figure est déjà fermée.':'Ce point est déjà dans la figure.');t.picks=[a];toolRender();draw();return}}
+  else{// point d'une ligne d'un seul point du même code (ex. « 385 5.1 ») : il est repris dans la ligne ; si la ligne vient d'être commencée, elle prend son numéro
+    const ex=linkExisting(pc,b);let old=null;cl.bSnap={r:S.rows[b],st:snapState(S.rows[b])};
+    if(ex&&ex.str!==cl.str&&ex.pts.length===1){S.rows[b].desc=patchLinkDesc(S.rows[b].desc,pc+'|'+ex.str,()=>null);if(cl.fresh){old=pc+'|'+cl.str;cl.str=ex.str;cl.fresh=false}}
+    cl.pts.push(b);cl.old=old}
   const pts=cl.pts.slice().sort((x,y)=>x-y),key=pc+'|'+cl.str;
-  const items=pts.map(i=>({r:S.rows[i],st:snapState(S.rows[i])}));
-  pts.forEach((i,k)=>{const r=S.rows[i];let d=patchLinkDesc(r.desc,key,()=>null);
+  const items=pts.map(i=>cl.bSnap&&cl.bSnap.r===S.rows[i]?cl.bSnap:({r:S.rows[i],st:snapState(S.rows[i])}));cl.bSnap=null;
+  pts.forEach((i,k)=>{const r=S.rows[i];let d=patchLinkDesc(r.desc,key,()=>null);if(cl.old)d=patchLinkDesc(d,cl.old,()=>null);
     const ctrl=k===0?'1':(cl.closed&&k===pts.length-1?'2':null);d=addLinkDesc(d,{pcode:pc,str:cl.str,ctrl});r.desc=d});
   S.hist.push({type:'snap',items,fields:['desc'],label:key});
   S.journal.push({name:`${S.rows[a].name} → ${S.rows[b].name}`,before:'',after:pts.map(i=>S.rows[i].desc).join(' / '),why:`Liaison ajoutée en code ${pc} / string ${cl.str}${closing?' (zone fermée)':''}, en plus des liaisons existantes`,t:new Date().toLocaleString('fr-CA')});
   run();
   if(closing){S.tool={kind:'link',picks:[],lc:t.lc};toast(`Zone ${pc} / ${cl.str} fermée (${pts.length} points).`)}
-  else S.tool={kind:'link',picks:[b],chain:true,lc:t.lc,cl};
+  else S.tool={kind:'link',picks:[b],chain:true,lc:t.lc,auto:t.lc?undefined:pc,cl};
   toolRender();draw();
 }
 /* ===================== ANALYSE (v9.5) =====================
@@ -2482,6 +2492,8 @@ function toolPick(i){
   // LIER en continu : une seule liaison possible → appliquée d'office, le point touché devient le départ de la suivante
   if(t.kind==='ana'){t.R=null;if(t.picks.length===2)anaRun(t)}
   if(t.kind==='link'&&t.lc&&t.picks.length===2){linkWithCode(t);return}
+  if(t.kind==='link'&&!t.lc&&t.picks.length===2){const pa=parseDesc(S.rows[t.picks[0]].desc).pcode,pb=parseDesc(S.rows[t.picks[1]].desc).pcode;
+    if(pa&&pa===pb&&CODES.get(pa)&&!CALC_CODES.has(pa)){t.auto=pa;linkWithCode(t);return}}
   if(t.kind==='link'&&t.picks.length===2){const [a,b]=t.picks;const opts=linkOptions(a,b);
     if(opts.length===1){opts[0].fn();S.tool={kind:'link',picks:[b],chain:true};toolRender();draw();return}}
   toolRender();draw();
