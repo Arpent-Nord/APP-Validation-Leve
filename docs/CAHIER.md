@@ -20,7 +20,7 @@
 4. **Lire les anomalies** (onglet Anomalies) : erreurs (rouge), avertissements, notes. Toucher une anomalie cadre le point sur le plan ; la plupart proposent un bouton de correction.
 5. **Corriger** avec la barre d'outils :
    - Codes hors standard → **CODES** (association aux codes ArpentNord, mémoire par arpenteur).
-   - Lignes → **INV PTS, INV LIGNE, FERMER, LIER 2 PTS** (continu, code de liaison au choix), **DÉLIER, UNIR, EFFACER LIAISONS**.
+   - Lignes → **INV PTS, INV LIGNE, FERMER, LIER 2 PTS** (continu, code de liaison au choix), **DÉLIER, UNIR, EFFACER LIAISONS** (tout le levé, un code, ou les lignes touchées sur le plan).
    - Points calculés → **RECT, 2P, 2PD, 2D, 3PP, 4P, 3C**.
    - **HAUT. ANT.** (hauteur d'antenne / prisme), **NUMÉROTER** (standard ArpentNord), effacer / rétablir un point (fiche du point).
    - **Annuler**, **Historique** (annuler une correction précise).
@@ -111,6 +111,7 @@ Un guide illustré est disponible : `guide.html` (bouton Documentation de la Bo�
 | v9.8 | 2026-11-17 | Calibration de site Emlid jointe au rapport (paires, résidus, paramètres) ; section « Points connus contrôlés » |
 | v9.9 | 2026-11-18 | Lignes tracées dans Emlid (code « 526_2 », Control code CLS) reprises d'office en liaisons ArpentNord |
 | v9.10 | 2026-11-18 | _modif.txt : « * » devant tout ce qui suit le code et la liaison (gabarit Civil 3D) ; point calculé hors ligne = code 300 PCB (« 300 CALCUL 526 »), dans une ligne = code de la ligne + CALCUL |
+| v9.11 | 2026-11-18 | EFFACER LIAISONS : « Lignes choisies sur le plan… » (toucher les lignes à effacer, en rouge) |
 
 ## 9. Responsables
 
