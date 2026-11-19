@@ -119,6 +119,7 @@ Un guide illustré est disponible : `guide.html` (bouton Documentation de la Bo�
 | v9.16 | 2026-11-19 | Points d'intérêt au rapport (vue centrée numérotée, distances choisies entre les points, cotes point–ligne, point de référence avec désignation et symbole, symboles libres CC0 Temaki/Maki, coordonnées, exports CSV/DXF) ; sections du rapport affichées/cachées, préréglage « Rapport client » |
 | v9.17 | 2026-11-19 | Fond d'ortho / imagerie sous la vue des points d'intérêt ; secteur marqué (cercle rouge, étoile) sur la vue générale ; case devant chaque titre de l'aperçu pour afficher / cacher la section |
 | v9.18 | 2026-11-19 | Fond → « Dossier de tuiles » : index des tuiles (INDEX_TUILES.csv ou .jgw), choix automatique de l'ortho qui couvre le levé, chargement des seules tuiles utiles ; « Charger les tuiles de la vue », « Une tuile de plus autour », choix d'une autre ortho, aperçu complet ; contour des tuiles non chargées (plan seulement) ; dossier retenu (Chrome / Edge) |
+| v9.19 | 2026-11-19 | Dossier de tuiles : ortho la plus récente d'abord, point par point (une plus ancienne ne comble que les trous) ; tuiles superposées par date, la plus récente par-dessus ; « tuiles de la vue » prend la plus récente par case ; liste des orthos triée par date |
 
 ## 9. Responsables
 
