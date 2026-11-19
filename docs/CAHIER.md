@@ -26,7 +26,7 @@
    - **Annuler**, **Historique** (annuler une correction précise).
 6. **ANALYSE** (facultatif) : analyse d'un fossé entre deux points (eau accumulée, débordement, sens et pente d'écoulement) → « Ajouter au rapport ».
 7. **Fond** (facultatif) : orthophoto du projet (image + fichier de référence) ou imagerie en ligne.
-8. **Rapport** : titre et commentaires modifiables (repris au début du rapport et gardés dans la séance), aperçu, **calibration de site Emlid** (coller le texte des pages Flow 360 « Informations sur le système de coordonnées » et « Points de localisation »), ajout de photos du terrain (légende et taille au rapport pour chacune : petite, moyenne, pleine largeur), « Enregistrer _rapport.html » ou « Imprimer / PDF ».
+8. **Rapport** : **Points d'intérêt…** (points choisis par code ou sur le plan, étiquettes et symboles, point de référence avec désignation et symbole, distances cochées entre les points (1–2, 1–3…), autres cotes entre deux points ou d'un point à une ligne de deux points ; symboles des bibliothèques publiques Temaki et Maki (CC0) ; section en tête du rapport avec vue, coordonnées et distances ; exports CSV et DXF de ces points), **sections affichées / cachées** (préréglages « Rapport client » / « Rapport complet »), titre et commentaires modifiables (repris au début du rapport et gardés dans la séance), aperçu, **calibration de site Emlid** (coller le texte des pages Flow 360 « Informations sur le système de coordonnées » et « Points de localisation »), ajout de photos du terrain (légende et taille au rapport pour chacune : petite, moyenne, pleine largeur), « Enregistrer _rapport.html » ou « Imprimer / PDF ».
 9. **Exporter _modif.txt** et **Exporter DXF** ; **Envoyer par Outlook…** au besoin.
 10. **Sauvegarder la séance** pour reprendre plus tard (ou sur un autre poste) : le fichier `_seance.json` se rouvre avec « Ouvrir un levé… ». Une sauvegarde automatique est aussi gardée dans le navigateur (5 derniers levés).
 
@@ -116,6 +116,7 @@ Un guide illustré est disponible : `guide.html` (bouton Documentation de la Bo�
 | v9.13 | 2026-11-18 | LIER 2 PTS en liaison libre : la ligne suit l'ordre touché ; à la fin, renumérotation proposée (mêmes numéros redistribués dans l'ordre de la ligne, rows replacées), bloquée si une autre ligne ou commande changerait d'ordre ; journal, rapport, Annuler |
 | v9.14 | 2026-11-18 | Implantation sans point numéroté (BOUTON, LIGNE1) : points de conception distingués des monuments, _stkd au standard date ; retrait (confirmé, annulable) des points importés non utilisés ; titre et commentaires du rapport |
 | v9.15 | 2026-11-18 | Photos du rapport : taille choisie pour chaque photo (petite, moyenne, pleine largeur) |
+| v9.16 | 2026-11-19 | Points d'intérêt au rapport (vue centrée numérotée, distances choisies entre les points, cotes point–ligne, point de référence avec désignation et symbole, symboles libres CC0 Temaki/Maki, coordonnées, exports CSV/DXF) ; sections du rapport affichées/cachées, préréglage « Rapport client » |
 
 ## 9. Responsables
 
