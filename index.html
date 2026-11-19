@@ -356,7 +356,7 @@ tr.hion td{background:color-mix(in srgb,#ffc440 18%,transparent)}
             <code>_</code><span>Liaison multiple sur un même point : <code>526 1.2_2.1</code> ferme le string 1 et débute le string 2 ; <code>181 1_186 1.1</code> continue le 181 et débute le 186 (double Pcode). Autant de liaisons que voulu.</span>
           </div>
           <p class="note">Format lu&nbsp;: <code>Matricule,Est,Nord,Élév,Description</code> où la description est <code>Pcode String.Contrôle [attributs]</code>, ex. <code>526 1.1</code>. Le fichier _modif est toujours écrit au format <code>P,N,E,Z,D</code> (Point, Nord, Est, Élév., Description), sans ligne d'en-tête, quel que soit le format lu. Il contient les descriptions corrigées, les coordonnées des points inversés et les points calculés (rectangle), insérés juste après le dernier point de leur ligne.</p>
-          <p class="note">Version v9.18-2026-11-19 · fonctionne hors ligne une fois ouverte · les fichiers restent sur l'appareil.</p>
+          <p class="note">Version v9.19-2026-11-19 · fonctionne hors ligne une fois ouverte · les fichiers restent sur l'appareil.</p>
           <div class="actions"><button class="btn sm" id="bJournal" type="button" disabled>Exporter le journal des corrections (.csv)</button><button class="btn sm" id="bResetLay" type="button">Rétablir les couches du gabarit</button></div>
         </div>
       </div>
@@ -3526,7 +3526,7 @@ bgSync();
    sinon les .jgw + en-têtes), retient l'ortho qui couvre le levé (la plus récente à égalité) et charge seulement
    les tuiles autour des points. On peut ajouter les tuiles de la vue, élargir d'une tuile, ou cocher une autre ortho.
    Le dossier est retenu sur l'appareil (Chrome / Edge) ; ailleurs, on le rechoisit (sélection de dossier). */
-const TD={h:null,name:'',idx:[],on:new Set(),line:LS.get('vl.tdLine',true),busy:false,need:false};
+const TD={h:null,name:'',idx:[],on:new Set(),part:new Map(),line:LS.get('vl.tdLine',true),busy:false,need:false};
 const tdIdb=(mode,fn)=>wdIdb(mode,fn);
 const tdDate=s=>{const m=String(s).match(/(?:^|[_\- ])(\d{6})(?=[_\- .]|$)/g);if(!m)return '';const d=m[m.length-1].replace(/\D/g,'');return d};
 const tdDateTxt=d=>d?`20${d.slice(0,2)}-${d.slice(2,4)}-${d.slice(4,6)}`:'';
@@ -3565,11 +3565,13 @@ const tdNear=(t,pts,m)=>pts.some(r=>r.e>=t.e0-m&&r.e<=t.e1+m&&r.n>=t.n0-m&&r.n<=
 const tdIn=(t,r)=>r.e>=t.e0&&r.e<=t.e1&&r.n>=t.n0&&r.n<=t.n1;
 function tdOrthos(){const m=new Map();for(const t of TD.idx){if(!m.has(t.o))m.set(t.o,{o:t.o,d:t.d,tiles:[],ap:null});const g=m.get(t.o);if(t.ap)g.ap=t;else if(!t.big)g.tiles.push(t)}return [...m.values()]}
 const tdLoaded=()=>BG.orthos.filter(o=>o.td);
-/* Choix automatique : l'ortho qui couvre le plus de points (la plus récente à égalité), puis une 2e si des points restent hors tuiles */
-function tdPick(){const pts=tdPts();const G=tdOrthos().filter(g=>g.tiles.length);const on=new Set();let rest=pts.slice();
-  while(rest.length&&on.size<4){let best=null,bc=0;for(const g of G){if(on.has(g.o))continue;const c=rest.filter(r=>g.tiles.some(t=>tdIn(t,r))).length;if(c>bc||(c===bc&&c>0&&best&&g.d>best.d)){best=g;bc=c}}
-    if(!best||!bc)break;on.add(best.o);rest=rest.filter(r=>!best.tiles.some(t=>tdIn(t,r)))}
+/* Choix automatique : pour chaque point, l'ortho la plus récente qui le couvre (date de vol AAMMJJ du nom) ;
+   une ortho plus ancienne ne sert qu'aux points que les récentes ne couvrent pas. Rend aussi les points attribués à chaque ortho. */
+function tdPick(){const pts=tdPts();const G=tdOrthos().filter(g=>g.tiles.length).sort((a,b)=>b.d.localeCompare(a.d));const on=new Set();TD.part=new Map();let rest=pts.slice();
+  for(const g of G){if(!rest.length||on.size>=6)break;const mine=rest.filter(r=>g.tiles.some(t=>tdIn(t,r)));if(!mine.length)continue;on.add(g.o);TD.part.set(g.o,mine);rest=rest.filter(r=>!mine.includes(r))}
   return on}
+/* ordre d'affichage : aperçus dessous, puis tuiles de la plus ancienne à la plus récente (la récente par-dessus), orthos ouvertes à la main au-dessus */
+function tdOrder(){const k=o=>o.td?(o.ap?'0':'1'+(o.tdd||'000000')):'2';BG.orthos.sort((a,b)=>k(a)<k(b)?-1:k(a)>k(b)?1:0)}
 async function tdLoad(list,why){list=list.filter(t=>!BG.orthos.some(o=>o.td===t.p));if(!list.length){tdUi();return 0}
   const n0=tdLoaded().length,tot=n0+list.length;let n=0;const errs=[];
   for(const t of list){tdStat(`Chargement des tuiles… ${n+1} / ${list.length}`);
@@ -3578,8 +3580,8 @@ async function tdLoad(list,why){list=list.filter(t=>!BG.orthos.some(o=>o.td===t.
       let sc=Math.min(1,Math.sqrt(150e6/Math.max(1,tot*d.w*d.h)),8192/Math.max(d.w,d.h));if(t.big)sc=Math.min(sc,Math.sqrt(40e6/(d.w*d.h)));
       const img=sc<.999?await createImageBitmap(f,{resizeWidth:Math.max(1,Math.round(d.w*sc)),resizeHeight:Math.max(1,Math.round(d.h*sc)),resizeQuality:'medium'}):await createImageBitmap(f);
       let [A,D,B,E,C,F]=w;const fx=d.w/img.width,fy=d.h/img.height;if(fx!==1||fy!==1){const C0=C-A/2-B/2,F0=F-D/2-E/2;A*=fx;D*=fx;B*=fy;E*=fy;C=C0+A/2+B/2;F=F0+D/2+E/2}
-      const o={name:t.p,img,w:img.width,h:img.height,A,B,C,D,E,F,hit:true,td:t.p,tdo:t.o,ap:t.ap};
-      if(t.ap)BG.orthos.unshift(o);else BG.orthos.push(o);n++;if(n%2===0)draw()}catch(e){errs.push(t.p.split('/').pop())}}
+      const o={name:t.p,img,w:img.width,h:img.height,A,B,C,D,E,F,hit:true,td:t.p,tdo:t.o,tdd:t.d,ap:t.ap};
+      BG.orthos.push(o);tdOrder();n++;if(n%2===0)draw()}catch(e){errs.push(t.p.split('/').pop())}}
   // au-delà de 40 tuiles, on libère les plus anciennes hors de la vue
   const L=tdLoaded().filter(o=>!o.ap);if(L.length>40){const [x0,y1]=S2W(0,0),[x1,y0]=S2W(S.W,S.H);for(const o of L.slice(0,L.length-40)){const e=o.C,nn=o.F;if(e>x1||e<x0-400||nn<y0||nn>y1+400){try{o.img.close&&o.img.close()}catch(er){}BG.orthos.splice(BG.orthos.indexOf(o),1)}}}
   if(n){BG.src='ortho';bgSave()}bgSync();draw();tdUi();
@@ -3587,14 +3589,16 @@ async function tdLoad(list,why){list=list.filter(t=>!BG.orthos.some(o=>o.td===t.
 function tdUnload(pred){for(const o of tdLoaded().filter(pred)){try{o.img.close&&o.img.close()}catch(e){}BG.orthos.splice(BG.orthos.indexOf(o),1)}bgSync();draw();tdUi()}
 async function tdAuto(quiet){if(!TD.idx.length||!S.rows.length)return;const pts=tdPts();if(!pts.length)return;
   tdUnload(o=>true);TD.on=tdPick();
-  let list=TD.idx.filter(t=>!t.ap&&TD.on.has(t.o)&&tdNear(t,pts,25));
-  if(list.length>24){list=TD.idx.filter(t=>!t.ap&&TD.on.has(t.o)&&pts.some(r=>tdIn(t,r)))}
+  const near=m=>TD.idx.filter(t=>!t.ap&&TD.on.has(t.o)&&tdNear(t,TD.part.get(t.o)||[],m));
+  let list=near(25);if(list.length>24)list=TD.idx.filter(t=>!t.ap&&TD.on.has(t.o)&&(TD.part.get(t.o)||[]).some(r=>tdIn(t,r)));
   if(!list.length){// pas de tuile : aperçu (ou ortho entière légère) qui couvre le levé
     const ap=TD.idx.filter(t=>t.ap&&pts.some(r=>tdIn(t,r))).sort((a,b)=>b.d.localeCompare(a.d))[0]||TD.idx.filter(t=>!t.big&&pts.some(r=>tdIn(t,r))).sort((a,b)=>b.d.localeCompare(a.d))[0];
     if(ap){TD.on=new Set([ap.o]);await tdLoad([ap],`(aperçu de ${ap.o} : aucune tuile fine sur ce levé)`)}else{tdUi();if(!quiet)toast(`Aucune tuile du dossier ${TD.name} ne couvre ce levé (vérifiez la zone MTM).`)}return}
-  await tdLoad(list,`de ${[...TD.on].join(' + ')}`)}
+  await tdLoad(list,`de ${[...TD.on].join(' + ')}${TD.on.size>1?' (la plus récente par-dessus)':''}`)}
 async function tdView(){if(!TD.idx.length)return;const [x0,y1]=S2W(0,0),[x1,y0]=S2W(S.W,S.H);
   const ins=t=>!t.ap&&t.e1>x0&&t.e0<x1&&t.n1>y0&&t.n0<y1;let list=TD.idx.filter(t=>ins(t)&&(!TD.on.size||TD.on.has(t.o)));
+  {const cell=new Map();for(const t of list){const k=Math.round(t.e0)+'_'+Math.round(t.n0);(cell.get(k)||cell.set(k,[]).get(k)).push(t)}
+   const keep=[];for(const v of cell.values()){v.sort((a,b)=>b.d.localeCompare(a.d));keep.push(v[0])}list=keep}
   if(!list.length){// autre ortho : la plus récente pour chaque case
     const cell=new Map();for(const t of TD.idx.filter(ins)){const k=Math.round(t.e0)+'_'+Math.round(t.n0);const c=cell.get(k);if(!c||t.d>c.d)cell.set(k,t)}list=[...cell.values()];list.forEach(t=>TD.on.add(t.o))}
   const todo=list.filter(t=>!BG.orthos.some(o=>o.td===t.p));
@@ -3613,8 +3617,8 @@ function tdUi(){const box=$('tdList');if(!box)return;const has=TD.idx.length>0;
   if(!has){box.innerHTML='';tdStat(TD.h?`${TD.name} (à rouvrir)`:'aucun');return}
   const nT=TD.idx.filter(t=>!t.ap&&!t.big).length,L=tdLoaded();tdStat(`${TD.name} · ${nT} tuile(s), ${tdOrthos().filter(g=>g.tiles.length||g.ap).length} ortho(s) · ${L.filter(o=>!o.ap).length} chargée(s)`);
   const pts=tdPts();const G=tdOrthos().map(g=>({...g,cov:pts.length?pts.filter(r=>g.tiles.some(t=>tdIn(t,r))||(g.ap&&tdIn(g.ap,r))).length:0}))
-    .filter(g=>g.cov||TD.on.has(g.o)||L.some(o=>o.tdo===g.o)).sort((a,b)=>b.cov-a.cov||b.d.localeCompare(a.d));
-  box.innerHTML=G.length?`<div class="note" style="margin:2px 0">Orthos qui couvrent ce levé :</div>`+G.map(g=>{const n=L.filter(o=>o.tdo===g.o&&!o.ap).length;
+    .filter(g=>g.cov||TD.on.has(g.o)||L.some(o=>o.tdo===g.o)).sort((a,b)=>b.d.localeCompare(a.d)||b.cov-a.cov);
+  box.innerHTML=G.length?`<div class="note" style="margin:2px 0">Orthos qui couvrent ce levé (la plus récente en tête ; cochées = affichées, la plus récente par-dessus) :</div>`+G.map(g=>{const n=L.filter(o=>o.tdo===g.o&&!o.ap).length;
     return `<label style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><input type="checkbox" data-tdo="${esc(g.o)}" ${TD.on.has(g.o)?'checked':''}> <b>${esc(g.o)}</b> <span class="note">${g.d?tdDateTxt(g.d)+' · ':''}${g.cov}/${pts.length} pts couverts · ${n} tuile(s) chargée(s)${g.ap?` · <a href="#" data-tdap="${esc(g.o)}">aperçu complet</a>`:''}</span></label>`}).join(''):
     `<div class="note">Aucune ortho de ${esc(TD.name)} ne couvre ce levé.</div>`}
 async function tdOpen(list,name,h){if(!list.length){toast('Dossier vide ou sans image.');return}
