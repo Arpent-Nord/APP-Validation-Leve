@@ -356,7 +356,7 @@ tr.hion td{background:color-mix(in srgb,#ffc440 18%,transparent)}
             <code>_</code><span>Liaison multiple sur un même point : <code>526 1.2_2.1</code> ferme le string 1 et débute le string 2 ; <code>181 1_186 1.1</code> continue le 181 et débute le 186 (double Pcode). Autant de liaisons que voulu.</span>
           </div>
           <p class="note">Format lu&nbsp;: <code>Matricule,Est,Nord,Élév,Description</code> où la description est <code>Pcode String.Contrôle [attributs]</code>, ex. <code>526 1.1</code>. Le fichier _modif est toujours écrit au format <code>P,N,E,Z,D</code> (Point, Nord, Est, Élév., Description), sans ligne d'en-tête, quel que soit le format lu. Il contient les descriptions corrigées, les coordonnées des points inversés et les points calculés (rectangle), insérés juste après le dernier point de leur ligne.</p>
-          <p class="note">Version v9.16-2026-11-19 · fonctionne hors ligne une fois ouverte · les fichiers restent sur l'appareil.</p>
+          <p class="note">Version v9.17-2026-11-19 · fonctionne hors ligne une fois ouverte · les fichiers restent sur l'appareil.</p>
           <div class="actions"><button class="btn sm" id="bJournal" type="button" disabled>Exporter le journal des corrections (.csv)</button><button class="btn sm" id="bResetLay" type="button">Rétablir les couches du gabarit</button></div>
         </div>
       </div>
@@ -403,7 +403,7 @@ tr.hion td{background:color-mix(in srgb,#ffc440 18%,transparent)}
     <div class="field"><label for="repC">Commentaires (paraissent au début du rapport)</label><textarea id="repC" rows="2" placeholder="ex. Implantation d'un bouton poussoir sur le trottoir existant. Une marque au feutre indique ce point, voir les photos ci-dessous."></textarea></div>
     <iframe id="repFrame" title="Aperçu du rapport"></iframe>
     <div class="actions" style="justify-content:flex-start"><button class="btn" id="poiOpen" type="button">Points d'intérêt…</button><span class="note" id="poiN"></span><button class="btn" id="calOpen" type="button">Calibration de site (Emlid)…</button><span class="note" id="calN"></span><label class="btn filebtn">Ajouter des photos du terrain…<input type="file" id="phIn" accept="image/*" multiple></label><span class="note" id="phN"></span></div>
-    <details id="secBox"><summary class="note" style="cursor:pointer">Sections du rapport (afficher / cacher)</summary><div class="actions" style="justify-content:flex-start;margin:6px 0"><button class="btn sm" id="secClient" type="button">Rapport client</button><button class="btn sm" id="secAll" type="button">Rapport complet</button><span class="note">Rapport client : points d'intérêt, implantation, photos ; les sections techniques sont cachées.</span></div><div id="secList" style="display:flex;flex-wrap:wrap;gap:4px 14px"></div></details>
+    <details id="secBox"><summary class="note" style="cursor:pointer">Sections du rapport (afficher / cacher) — ou cochez / décochez la case devant chaque titre dans l'aperçu</summary><div class="actions" style="justify-content:flex-start;margin:6px 0"><button class="btn sm" id="secClient" type="button">Rapport client</button><button class="btn sm" id="secAll" type="button">Rapport complet</button><span class="note">Rapport client : points d'intérêt, implantation, photos ; les sections techniques sont cachées.</span></div><div id="secList" style="display:flex;flex-wrap:wrap;gap:4px 14px"></div></details>
     <div id="phList" style="display:flex;gap:8px;flex-wrap:wrap;max-height:12.5em;overflow:auto;flex-shrink:0"></div>
     <div class="actions"><button class="btn primary" id="repSave" type="button">Enregistrer _rapport.html</button><button class="btn" id="repPrint" type="button">Imprimer / PDF</button><button class="btn" id="repClose" type="button">Fermer</button></div>
   </div>
@@ -422,7 +422,8 @@ tr.hion td{background:color-mix(in srgb,#ffc440 18%,transparent)}
     <p class="note" style="margin:0">Deux points : distance entre eux. Trois points : distance du 1<sup>er</sup> point à la ligne passant par les deux autres (perpendiculaire), avec le côté.</p>
     <p class="note" style="margin:0">Symboles : bibliothèques publiques libres de droits (Temaki et Maki, CC0), sans lien avec les blocs AutoCAD.</p>
     <div id="cotList"></div>
-    <label class="note"><input type="checkbox" id="poiRepl" checked> Remplace la « Vue du levé » du rapport</label>
+    <label class="note"><input type="checkbox" id="poiBg" checked> Fond de plan (ortho / imagerie active) sous la vue des points d'intérêt</label>
+    <label class="note"><input type="checkbox" id="poiRepl" checked> Remplace la « Vue du levé » du rapport (sinon la vue générale est gardée, avec le secteur marqué d'une étoile)</label>
     <div class="actions"><button class="btn" id="poiCsv" type="button">Exporter CSV des points d'intérêt</button><button class="btn" id="poiDxf" type="button">Exporter DXF des points d'intérêt</button><button class="btn primary" id="poiClose" type="button">Fermer</button></div>
   </div>
 </div>
@@ -1575,7 +1576,7 @@ function sessEntry(force){
     for(const k of ['del','hi','swapNote','bad'])if(r[k]!=null)o[k]=r[k];
     if(r.calc){const c=r.calc;o.calc=Object.assign({},c,{refs:(c.refs||[]).map(x=>typeof x==='number'?x:idx.get(x)).filter(x=>x!=null)})}
     return o});
-  return {key:S.sessKey,name:S.fileName,enc:S.enc,t:Date.now(),n:nMod,text:S.srcText,rows,journal:S.journal,renumLog:S.renumLog||[],hiLog:S.hiLog||[],repTitle:S.repTitle||'',repNote:S.repNote||'',repHide:S.repHide||[],poi:S.poi?{pts:poiRows().map(p=>({name:p.r.name,label:p.label,sym:p.sym||''})),ref:S.poi.ref?S.poi.ref.name:null,refLabel:S.poi.refLabel||'',refSym:S.poi.refSym||'',refCot:!!S.poi.refCot,cotes:S.poi.cotes,pairs:S.poi.pairs||[],repl:S.poi.repl!==false}:null};
+  return {key:S.sessKey,name:S.fileName,enc:S.enc,t:Date.now(),n:nMod,text:S.srcText,rows,journal:S.journal,renumLog:S.renumLog||[],hiLog:S.hiLog||[],repTitle:S.repTitle||'',repNote:S.repNote||'',repHide:S.repHide||[],poi:S.poi?{pts:poiRows().map(p=>({name:p.r.name,label:p.label,sym:p.sym||''})),ref:S.poi.ref?S.poi.ref.name:null,refLabel:S.poi.refLabel||'',refSym:S.poi.refSym||'',refCot:!!S.poi.refCot,cotes:S.poi.cotes,pairs:S.poi.pairs||[],repl:S.poi.repl!==false,bg:S.poi.bg!==false}:null};
 }
 /* Fichier de séance : même contenu que la sauvegarde automatique + analyses ajoutées au rapport */
 function sessFileName(){return S.fileName.replace(/\.[^.]+$/,'')+'_seance.json'}
@@ -1597,7 +1598,7 @@ function sessRestore(ent){
       for(const k of ['del','hi','swapNote','bad'])if(o[k]!=null)r[k]=o[k];return r});
     ent.rows.forEach((o,k)=>{if(o.calc)rows[k].calc=Object.assign({},o.calc,{refs:o.calc.refs.map(j=>rows[j]).filter(Boolean)})});
     S.rows=rows;S.F.rows=rows;reindex();S.journal=ent.journal||[];S.renumLog=ent.renumLog||[];S.hiLog=ent.hiLog||[];S.repTitle=ent.repTitle||'';S.repNote=ent.repNote||'';S.repHide=ent.repHide||[];
-    if(ent.poi){const R=n=>rows.find(r=>r.name===n&&!r.del);S.poi={pts:(ent.poi.pts||[]).map(p=>({r:R(p.name),label:p.label||'',sym:p.sym||''})).filter(p=>p.r),ref:ent.poi.ref?R(ent.poi.ref)||null:null,refLabel:ent.poi.refLabel||'',refSym:ent.poi.refSym||'',refCot:!!ent.poi.refCot,cotes:ent.poi.cotes||[],pairs:ent.poi.pairs||[],repl:ent.poi.repl!==false}}else S.poi=null;S.hist=[];S.sel=null;
+    if(ent.poi){const R=n=>rows.find(r=>r.name===n&&!r.del);S.poi={pts:(ent.poi.pts||[]).map(p=>({r:R(p.name),label:p.label||'',sym:p.sym||''})).filter(p=>p.r),ref:ent.poi.ref?R(ent.poi.ref)||null:null,refLabel:ent.poi.refLabel||'',refSym:ent.poi.refSym||'',refCot:!!ent.poi.refCot,cotes:ent.poi.cotes||[],pairs:ent.poi.pairs||[],repl:ent.poi.repl!==false,bg:ent.poi.bg!==false}}else S.poi=null;S.hist=[];S.sel=null;
     S.journal.push({name:'Séance',before:'',after:'',why:`Séance d'édition reprise (sauvegarde du ${new Date(ent.t).toLocaleString('fr-CA')})`,t:new Date().toLocaleString('fr-CA')});
   }finally{S.restoring=false}
   run();fit();$('fname').textContent=ent.name+' · '+S.rows.length+' points';
@@ -2519,7 +2520,7 @@ function planShot(box,keepTool){
   if(box){const pad=Math.max(4,(box[2]-box[0])*.06);fitBox(box[0]-pad,box[1]-pad,box[2]+pad,box[3]+pad,5)}
   S.sel=null;S.hl=null;if(!keepTool)S.tool=null;
   let crop=null;if(box){const cs=[[box[0],box[1]],[box[2],box[1]],[box[0],box[3]],[box[2],box[3]]].map(([x,y])=>W2S(x,y));const m=36;crop=[Math.max(0,Math.min(...cs.map(c=>c[0]))-m),Math.max(0,Math.min(...cs.map(c=>c[1]))-m-24),Math.min(S.W,Math.max(...cs.map(c=>c[0]))+m),Math.min(S.H,Math.max(...cs.map(c=>c[1]))+m)];if(crop[3]-crop[1]<S.H*.45){const cy=(crop[1]+crop[3])/2,h=S.H*.45;crop[1]=Math.max(0,cy-h/2);crop[3]=Math.min(S.H,cy+h/2)}}
-  const one=bg=>{const c=document.createElement('canvas');c.width=Math.round(S.W*2);c.height=Math.round(S.H*2);ctx=c.getContext('2d');ctx.setTransform(2,0,0,2,0,0);const b0=BG.src;if(!bg)BG.src='none';try{draw()}finally{BG.src=b0}
+  const one=bg=>{const c=document.createElement('canvas');c.width=Math.round(S.W*2);c.height=Math.round(S.H*2);ctx=c.getContext('2d');ctx.setTransform(2,0,0,2,0,0);const b0=BG.src;if(!bg)BG.src='none';try{draw();if(S.shotMark)poiMark(S.shotMark)}finally{BG.src=b0}
     if(crop){const o=document.createElement('canvas');o.width=Math.round((crop[2]-crop[0])*2);o.height=Math.round((crop[3]-crop[1])*2);o.getContext('2d').drawImage(c,crop[0]*2,crop[1]*2,o.width,o.height,0,0,o.width,o.height);return o.toDataURL('image/jpeg',.86)}
     return c.toDataURL('image/jpeg',.86)};
   try{try{url=one(true)}catch(e){noBg=true;url=one(false)}}catch(e){url=null}
@@ -2611,7 +2612,7 @@ function poiSvg(){const P=poiRows();if(!P.length)return '';const C=poiCotes(),re
   const span=Math.max(x1-x0,y1-y0,3),pad=span*.16+.8;x0-=pad;x1+=pad;y0-=pad;y1+=pad;
   const W=900;let H=Math.round(W*(y1-y0)/(x1-x0));if(H<380){const c=(y0+y1)/2,h=(x1-x0)*380/W;y0=c-h/2;y1=c+h/2;H=380}if(H>640){const c=(x0+x1)/2,w=(y1-y0)*W/640;x0=c-w/2;x1=c+w/2;H=640}
   const k=W/(x1-x0),X=e=>((e-x0)*k).toFixed(1),Y=n=>((y1-n)*k).toFixed(1),inb=r=>r.e>=x0&&r.e<=x1&&r.n>=y0&&r.n<=y1;
-  const g=[];
+  const g=[];const bgu=S.poi.bg!==false?bgShot(x0,y0,x1,y1,W,H):null;if(bgu)g.push(`<image href="${bgu}" x="0" y="0" width="${W}" height="${H}" preserveAspectRatio="none"/>`);
   // lignes du levé (contexte)
   S.lines.forEach((L,i)=>{const v=S.verts[i]||[];if(v.length<2||!v.some(p=>p[0]>=x0&&p[0]<=x1&&p[1]>=y0&&p[1]<=y1))return;g.push(`<path d="M${v.map(p=>X(p[0])+','+Y(p[1])).join('L')}" fill="none" stroke="#b9c4c9" stroke-width="1.2"/>`)});
   // points du levé (contexte)
@@ -2636,12 +2637,23 @@ function poiSvg(){const P=poiRows();if(!P.length)return '';const C=poiCotes(),re
   g.push(`<g transform="translate(${W-34},18)"><path d="M0,0 L9,24 L0,18 L-9,24Z" fill="#14191d"/><text x="0" y="38" text-anchor="middle" font-size="12" font-weight="700" fill="#14191d">N</text></g>`);
   g.push(`<g transform="translate(16,${H-18})"><rect x="0" y="-5" width="${(sw/2).toFixed(1)}" height="5" fill="#14191d"/><rect x="${(sw/2).toFixed(1)}" y="-5" width="${(sw/2).toFixed(1)}" height="5" fill="#fff" stroke="#14191d"/><rect x="0" y="-5" width="${sw.toFixed(1)}" height="5" fill="none" stroke="#14191d"/><text x="0" y="12" font-size="10" fill="#14191d">0</text><text x="${sw.toFixed(1)}" y="12" font-size="10" text-anchor="end" fill="#14191d">${sb} m</text></g>`);
   return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Vue des points d'intérêt" style="max-width:${W}px;border:1px solid #d5dde1;border-radius:4px;background:#fff;font-family:Segoe UI,Arial,sans-serif">${g.join('')}</svg>`}
+/* image du fond de plan (ortho ou imagerie) exactement sur l'emprise E/N donnée, pour la vue des points d'intérêt */
+function bgShot(x0,y0,x1,y1,W,H){if(typeof BG==='undefined'||BG.src==='none')return null;const s0={W:S.W,H:S.H,view:S.view},c0=ctx;let url=null;
+  try{const c=document.createElement('canvas');c.width=W*2;c.height=H*2;ctx=c.getContext('2d');ctx.setTransform(2,0,0,2,0,0);ctx.fillStyle='#fff';ctx.fillRect(0,0,W,H);
+    S.W=W;S.H=H;S.view={cx:(x0+x1)/2,cy:(y0+y1)/2,k:W/(x1-x0)};drawBg();url=c.toDataURL('image/jpeg',.85)}catch(e){url=null}finally{ctx=c0;S.W=s0.W;S.H=s0.H;S.view=s0.view}return url}
+/* Aperçu du rapport : une case devant chaque titre de section pour l'afficher ou la cacher (pas dans le fichier enregistré) */
+function repPreview(){S.repPreview=true;let h;try{h=reportHTML()}finally{S.repPreview=false}const f=$('repFrame');try{S.repScroll=f.contentWindow?f.contentWindow.scrollY:null}catch(e){}f.srcdoc=h}
+$('repFrame').onload=()=>{let d;try{d=$('repFrame').contentDocument}catch(e){return}if(!d||!d.head)return;
+  const st=d.createElement('style');st.textContent='.secchk{margin:0 8px 0 0;transform:scale(1.3);vertical-align:middle;cursor:pointer;accent-color:#0e6f66}section.off{opacity:.45}section.off h2{text-decoration:line-through}section.off h2::after{content:"  (cachée)";font-size:.75em;text-transform:none;letter-spacing:0}@media print{.secchk,section.off{display:none!important}}';d.head.appendChild(st);
+  d.querySelectorAll('section[data-sec]').forEach(s=>{const h=s.querySelector('h2');if(!h)return;const cb=d.createElement('input');cb.type='checkbox';cb.className='secchk';cb.checked=!s.classList.contains('off');cb.title='Afficher cette section dans le rapport';h.prepend(cb);
+    cb.onchange=()=>{const H=new Set(S.repHide||[]);cb.checked?H.delete(s.dataset.sec):H.add(s.dataset.sec);S.repHide=[...H];repPreview();secRender();sessSchedule()}});
+  if(S.repScroll){try{$('repFrame').contentWindow.scrollTo(0,S.repScroll)}catch(e){}}};
 function poiReportSec(e,sec,tbl,f3){const P=poiRows();if(!P.length)return '';const ref=S.poi.ref&&S.rows.includes(S.poi.ref)?S.poi.ref:null;const C=poiCotes();
   const trs=P.map((p,i)=>{const pc=parseDesc(p.r.desc).pcode,c=CODES.get(String(pc));return `<tr><td><b>${i+1}</b></td><td>${p.sym?symIcon(p.sym,16)+' ':''}${e(p.label||'')}</td><td class="m">${e(p.r.name)}</td><td>${e(pc||'')}${c?' '+e(c.abr)+' <span class="sub">'+e(c.desc)+'</span>':''}</td><td>${f3(p.r.e)}</td><td>${f3(p.r.n)}</td><td>${f3(p.r.z)}</td>${ref?`<td><b>${hd2(p.r,ref).toFixed(3)}</b></td>`:''}</tr>`});
   const ctr=C.map(c=>{if(c.c){const o=offLine(c.a,c.b,c.c);return o?`<tr><td>${poiNo(c.a)?`<b>${poiNo(c.a)}</b> · `:''}<span class="m">${e(c.a.name)}</span></td><td>ligne <span class="m">${e(c.b.name)}</span> – <span class="m">${e(c.c.name)}</span></td><td><b>${o.d.toFixed(3)}</b></td><td>perpendiculaire, à ${o.side} de la ligne${o.t<0||o.t>1?' (hors du segment)':''}</td></tr>`:''}
     if(c.ref)return '';
     return `<tr><td>${poiNo(c.a)?`<b>${poiNo(c.a)}</b> · `:''}<span class="m">${e(c.a.name)}</span></td><td>${poiNo(c.b)?`<b>${poiNo(c.b)}</b> · `:''}<span class="m">${e(c.b.name)}</span></td><td><b>${hd2(c.a,c.b).toFixed(3)}</b></td><td>entre les points · ΔZ ${(c.b.z-c.a.z).toFixed(3)}</td></tr>`});
-  return sec('Points d\'intérêt',`${poiSvg()}<p class="note">Pastilles jaunes : points d'intérêt numérotés (tableau ci-dessous)${ref?` · en vert : point de référence${S.poi.refLabel?' ('+e(S.poi.refLabel)+')':''}`:''}${C.length?' · en bleu : cotes (distances horizontales)':''} · en gris : autres points et lignes du levé.</p>
+  return sec('Points d\'intérêt',`${poiSvg()}<p class="note">${S.poi.bg!==false&&typeof BG!=='undefined'&&BG.src!=='none'?'Fond : '+(BG.src==='ortho'?'orthophoto du projet':'imagerie en ligne')+' · ':''}Pastilles jaunes : points d'intérêt numérotés (tableau ci-dessous)${ref?` · en vert : point de référence${S.poi.refLabel?' ('+e(S.poi.refLabel)+')':''}`:''}${C.length?' · en bleu : cotes (distances horizontales)':''} · en gris : autres points et lignes du levé.</p>
 ${tbl(['No','Élément','Matricule','Code','E','N','Z',...(ref?[`Distance à ${e(S.poi.refLabel||ref.name)} (m)`]:[])],trs)}
 ${ref?`<p class="note">${S.poi.refSym?symIcon(S.poi.refSym,18,'#0e6f66')+' ':''}Point de référence : <b>${e(S.poi.refLabel||'')}</b> ${e(ref.name)} — E ${f3(ref.e)} · N ${f3(ref.n)} · Z ${f3(ref.z)}.</p>`:''}
 ${ctr.filter(Boolean).length?`<h3 class="note">Cotes</h3>${tbl(['De','À','Distance (m)','Mesure'],ctr.filter(Boolean),'small')}`:''}
@@ -2650,7 +2662,7 @@ function poiRender(){poiInit();const P=poiRows();$('poiN').textContent=P.length?
   const codes=new Map();for(const r of S.rows){if(r.del||r.bad||r.ctl==='ref')continue;const pc=parseDesc(r.desc).pcode;if(pc)codes.set(pc,(codes.get(pc)||0)+1)}
   $('poiCode').innerHTML=[...codes.entries()].sort((a,b)=>+a[0]-+b[0]).map(([pc,n])=>{const c=CODES.get(String(pc));return `<option value="${esc(pc)}">${esc(pc)}${c?' '+esc(c.abr)+' · '+esc(c.desc):''} (${n})</option>`}).join('');
   $('poiList').innerHTML=P.length?`<table class="small" style="width:100%"><tbody>${P.map((p,i)=>`<tr><td><b>${i+1}</b></td><td><input class="poiLab" data-k="${i}" value="${esc(p.label||'')}" placeholder="élément (ex. Borne 1)" style="width:14em"></td><td class="mono">${esc(p.r.name)}</td><td class="mono">${esc(p.r.desc)}</td><td><select class="poiSym symSel" data-k="${i}" title="Symbole affiché à côté de la pastille">${symOpts(p.sym||'')}</select> ${symIcon(p.sym,18)}</td><td><button class="btn sm poiUp" data-k="${i}" type="button" title="Monter">↑</button><button class="btn sm poiDel" data-k="${i}" type="button">Retirer</button></td></tr>`).join('')}</tbody></table>`:'<p class="note">Aucun point d\'intérêt.</p>';
-  $('poiRef').value=S.poi.ref?S.poi.ref.name:'';$('poiRefLab').value=S.poi.refLabel||'';$('poiRefSym').innerHTML=symOpts(S.poi.refSym||'');$('poiRefIc').innerHTML=symIcon(S.poi.refSym,22,'#0e6f66');$('poiRefCot').checked=!!S.poi.refCot;$('poiRepl').checked=S.poi.repl!==false;
+  $('poiRef').value=S.poi.ref?S.poi.ref.name:'';$('poiRefLab').value=S.poi.refLabel||'';$('poiRefSym').innerHTML=symOpts(S.poi.refSym||'');$('poiRefIc').innerHTML=symIcon(S.poi.refSym,22,'#0e6f66');$('poiRefCot').checked=!!S.poi.refCot;$('poiRepl').checked=S.poi.repl!==false;$('poiBg').checked=S.poi.bg!==false;
   {const has=new Set(S.poi.pairs),L=[];for(let i=0;i<P.length;i++)for(let j=i+1;j<P.length;j++){const k=P[i].r.name+'|'+P[j].r.name,on=has.has(k)||has.has(P[j].r.name+'|'+P[i].r.name);L.push(`<label class="note" style="white-space:nowrap"><input type="checkbox" class="pairChk" value="${esc(k)}" ${on?'checked':''}> ${i+1}–${j+1} <span class="mono">(${hd2(P[i].r,P[j].r).toFixed(2)} m)</span></label>`)}
    $('pairList').innerHTML=L.length?L.join(''):'<span class="note">Ajoutez au moins 2 points d\'intérêt.</span>';
    $('pairList').querySelectorAll('.pairChk').forEach(x=>x.onchange=()=>{const [a,b]=x.value.split('|');S.poi.pairs=S.poi.pairs.filter(k=>k!==a+'|'+b&&k!==b+'|'+a);if(x.checked)S.poi.pairs.push(x.value);poiChanged()})}
@@ -2660,10 +2672,10 @@ function poiRender(){poiInit();const P=poiRows();$('poiN').textContent=P.length?
   $('poiList').querySelectorAll('.poiDel').forEach(x=>x.onclick=()=>{S.poi.pts.splice(+x.dataset.k,1);poiChanged(true)});
   $('poiList').querySelectorAll('.poiUp').forEach(x=>x.onclick=()=>{const k=+x.dataset.k;if(k>0){const t=S.poi.pts[k];S.poi.pts[k]=S.poi.pts[k-1];S.poi.pts[k-1]=t}poiChanged(true)});
   $('cotList').querySelectorAll('.cotDel').forEach(x=>x.onclick=()=>{S.poi.cotes.splice(+x.dataset.k,1);poiChanged(true)})}
-function poiChanged(re){if(re)poiRender();else $('poiN').textContent=`${poiRows().length} point(s)`;if(!$('repSheet').hidden)$('repFrame').srcdoc=reportHTML();sessSchedule();draw()}
+function poiChanged(re){if(re)poiRender();else $('poiN').textContent=`${poiRows().length} point(s)`;if(!$('repSheet').hidden)repPreview();sessSchedule();draw()}
 function poiAdd(r,label){poiInit();if(!r||S.poi.pts.some(p=>p.r===r))return false;S.poi.pts.push({r,label:label||''});return true}
 $('poiOpen').onclick=()=>{poiRender();$('poiSheet').hidden=false};
-$('poiClose').onclick=()=>{$('poiSheet').hidden=true;$('repFrame').srcdoc=reportHTML();secRender()};
+$('poiClose').onclick=()=>{$('poiSheet').hidden=true;repPreview();secRender()};
 $('poiAddCode').onclick=()=>{const pc=$('poiCode').value;const c=CODES.get(String(pc));let n=0;const rs=S.rows.filter(r=>!r.del&&!r.bad&&r.ctl!=='ref'&&parseDesc(r.desc).pcode===pc);
   rs.forEach((r,i)=>{if(poiAdd(r,c?`${c.desc.split(/[ ,(]/)[0]} ${poiRows().filter(p=>parseDesc(p.r.desc).pcode===pc).length+1}`:''))n++});
   {const P=poiRows();for(let i=0;i<P.length;i++)for(let j=i+1;j<P.length;j++){const a=P[i].r,b=P[j].r;if(rs.includes(a)&&rs.includes(b)&&!S.poi.pairs.some(k=>k===a.name+'|'+b.name||k===b.name+'|'+a.name))S.poi.pairs.push(a.name+'|'+b.name)}}toast(`${n} point(s) ajouté(s).`);poiChanged(true)};
@@ -2674,13 +2686,14 @@ $('poiRefLab').oninput=()=>{S.poi.refLabel=$('poiRefLab').value.trim();poiChange
 $('poiRefSym').onchange=()=>{S.poi.refSym=$('poiRefSym').value;$('poiRefIc').innerHTML=symIcon(S.poi.refSym,22,'#0e6f66');poiChanged()};
 $('poiRefCot').onchange=()=>{S.poi.refCot=$('poiRefCot').checked;poiChanged()};
 $('poiRepl').onchange=()=>{S.poi.repl=$('poiRepl').checked;poiChanged()};
+$('poiBg').onchange=()=>{S.poi.bg=$('poiBg').checked;poiChanged();setTimeout(()=>{if(!$('repSheet').hidden)repPreview()},1500)};
 $('cotAdd').onclick=()=>{const a=$('cotA').value.trim(),b=$('cotB').value.trim(),c=$('cotC').value.trim();const ok=n=>S.rows.some(r=>r.name===n&&!r.del);
   if(!ok(a)||!ok(b)||(c&&!ok(c))){toast('Matricule introuvable : vérifiez les points de la cote.');return}if(a===b||(c&&(c===b||c===a))){toast('Choisissez des points différents.');return}
   S.poi.cotes.push({a,b,c:c||null});$('cotA').value=$('cotB').value=$('cotC').value='';poiChanged(true)};
 $('poiPick').onclick=()=>{$('poiSheet').hidden=true;$('repSheet').hidden=true;S.tool={kind:'poipick',picks:[]};toolRender();draw()};
 function poiPickRender(bar){bar.hidden=false;const n=poiRows().length;
   bar.innerHTML=`<div class="tbmsg">Points d'intérêt : touchez les points à ajouter (pastilles jaunes numérotées) ; retouchez une pastille pour la retirer. ${n} point(s).</div><div class="actions"><button class="btn sm primary" id="ppDone" type="button">Terminer</button></div>`;
-  $('ppDone').onclick=()=>{S.tool=null;toolRender();draw();$('repFrame').srcdoc=reportHTML();$('repSheet').hidden=false;poiRender();$('poiSheet').hidden=false}}
+  $('ppDone').onclick=()=>{S.tool=null;toolRender();draw();repPreview();$('repSheet').hidden=false;poiRender();$('poiSheet').hidden=false}}
 function poiCsv(){const P=poiRows();const L=['No,Element,Matricule,E,N,Z,Description'].concat(P.map((p,i)=>[i+1,`"${(p.label||'').replace(/"/g,'""')}"`,p.r.name,p.r.xyz[0],p.r.xyz[1],p.r.xyz[2],`"${c3dDesc(p.r.desc).replace(/"/g,'""')}"`].join(',')));
   if(S.poi.ref){const r=S.poi.ref;L.push(['REF','"Référence"',r.name,r.xyz[0],r.xyz[1],r.xyz[2],`"${c3dDesc(r.desc).replace(/"/g,'""')}"`].join(','))}return L.join('\r\n')+'\r\n'}
 $('poiCsv').onclick=()=>{if(!poiRows().length){toast('Aucun point d\'intérêt.');return}save(base()+'_points-interet.csv',toCp1252(poiCsv()))};
@@ -2689,12 +2702,20 @@ $('poiDxf').onclick=()=>{const P=poiRows();if(!P.length){toast('Aucun point d\'i
 const SEC_TECH=['Sommaire','Qualité GNSS','Points calculés','Corrections apportées','Anomalies restantes','Liste des points','Renumérotation','Corrections de hauteur d\'antenne / prisme','Station totale'];
 function secRender(){const L=[...new Set(S.repSecs||[])],H=new Set(S.repHide||[]);
   $('secList').innerHTML=L.map(t=>`<label class="note"><input type="checkbox" class="secChk" value="${esc(t)}" ${H.has(t)?'':'checked'}> ${esc(t)}</label>`).join('')+[...H].filter(t=>!L.includes(t)).map(t=>`<label class="note"><input type="checkbox" class="secChk" value="${esc(t)}"> ${esc(t)}</label>`).join('');
-  $('secList').querySelectorAll('.secChk').forEach(x=>x.onchange=()=>{const H=new Set(S.repHide||[]);x.checked?H.delete(x.value):H.add(x.value);S.repHide=[...H];$('repFrame').srcdoc=reportHTML();sessSchedule()})}
-$('secClient').onclick=()=>{S.repHide=[...new Set((S.repSecs||[]).filter(t=>SEC_TECH.some(x=>t.startsWith(x))).concat(SEC_TECH))];$('repFrame').srcdoc=reportHTML();secRender();sessSchedule()};
-$('secAll').onclick=()=>{S.repHide=[];$('repFrame').srcdoc=reportHTML();secRender();sessSchedule()};
+  $('secList').querySelectorAll('.secChk').forEach(x=>x.onchange=()=>{const H=new Set(S.repHide||[]);x.checked?H.delete(x.value):H.add(x.value);S.repHide=[...H];repPreview();sessSchedule()})}
+$('secClient').onclick=()=>{S.repHide=[...new Set((S.repSecs||[]).filter(t=>SEC_TECH.some(x=>t.startsWith(x))).concat(SEC_TECH))];repPreview();secRender();sessSchedule()};
+$('secAll').onclick=()=>{S.repHide=[];repPreview();secRender();sessSchedule()};
+/* secteur des points d'intérêt sur la vue générale : cercle rouge, étoile et étiquette */
+function poiMark(P){let sx=0,sy=0;const ps=P.map(p=>W2S(p.r.e,p.r.n));ps.forEach(([x,y])=>{sx+=x;sy+=y});const cx=sx/ps.length,cy=sy/ps.length;
+  const r=Math.max(18,...ps.map(([x,y])=>Math.hypot(x-cx,y-cy)))+14;ctx.save();
+  ctx.lineWidth=4;ctx.strokeStyle='#fff';ctx.beginPath();ctx.arc(cx,cy,r,0,7);ctx.stroke();ctx.lineWidth=2.5;ctx.strokeStyle='#e5484d';ctx.beginPath();ctx.arc(cx,cy,r,0,7);ctx.stroke();
+  const st=(x,y,R)=>{ctx.beginPath();for(let i=0;i<10;i++){const a=-Math.PI/2+i*Math.PI/5,q=i%2?R*.45:R;ctx.lineTo(x+q*Math.cos(a),y+q*Math.sin(a))}ctx.closePath()};
+  const tx=cx+r*.72,ty=cy-r*.72;st(tx,ty,13);ctx.fillStyle='#e5484d';ctx.fill();ctx.lineWidth=1.5;ctx.strokeStyle='#fff';ctx.stroke();
+  ctx.font='bold 13px Segoe UI, Arial, sans-serif';const L="Points d'intérêt";ctx.lineWidth=4;ctx.strokeStyle='#fff';ctx.strokeText(L,tx+16,ty+5);ctx.fillStyle='#b4232a';ctx.fillText(L,tx+16,ty+5);ctx.restore()}
 function repPlanSec(e,sec){
-  if(!S.view||!S.rows.length||(S.anas||[]).length)return '';if(poiRows().length&&S.poi.repl!==false)return '';const sh=planShot(null);if(!sh)return '';
-  return sec('Vue du levé',`<figure style="margin:0"><img src="${sh.url}" alt="Vue du levé" style="width:100%;border:1px solid #d5dde1;border-radius:4px"><figcaption class="note">Vue du plan telle qu'affichée dans l'application au moment du rapport.${sh.noBg?' Fond de plan non inclus (le serveur d\'imagerie ne permet pas la copie).':''}</figcaption></figure>`);
+  if(!S.view||!S.rows.length||(S.anas||[]).length)return '';const P=poiRows();if(P.length&&S.poi.repl!==false)return '';
+  S.shotMark=P.length?P:null;let sh;try{sh=planShot(null)}finally{S.shotMark=null}if(!sh)return '';
+  return sec('Vue du levé',`<figure style="margin:0"><img src="${sh.url}" alt="Vue du levé" style="width:100%;border:1px solid #d5dde1;border-radius:4px"><figcaption class="note">Vue du plan telle qu'affichée dans l'application au moment du rapport.${P.length?' Cercle rouge et étoile : secteur des points d\'intérêt (détail plus haut).':''}${sh.noBg?' Fond de plan non inclus (le serveur d\'imagerie ne permet pas la copie).':''}</figcaption></figure>`);
 }
 
 function toolPick(i){
@@ -2931,8 +2952,8 @@ $('bDxf').onclick=()=>{if(numGate())return;
   if(errs)toast(`DXF produit avec ${errs} erreur(s) non corrigée(s) : ces points sont dessinés sans liaison.`);
 };
 $('bJournal').onclick=()=>{const f=csvFile();save(f.name,f.data)};
-$('bRep').onclick=()=>{$('repT').value=S.repTitle||'';$('repC').value=S.repNote||'';$('repFrame').srcdoc=reportHTML();$('repSheet').hidden=false;phRefresh();calNote();secRender();poiInit();$('poiN').textContent=poiRows().length?`${poiRows().length} point(s)`:''};
-{let tm=null;const upd=()=>{S.repTitle=$('repT').value.trim();S.repNote=$('repC').value.replace(/\s+$/,'');clearTimeout(tm);tm=setTimeout(()=>{$('repFrame').srcdoc=reportHTML();sessSchedule()},500)};$('repT').oninput=upd;$('repC').oninput=upd}
+$('bRep').onclick=()=>{$('repT').value=S.repTitle||'';$('repC').value=S.repNote||'';repPreview();$('repSheet').hidden=false;phRefresh();calNote();secRender();poiInit();$('poiN').textContent=poiRows().length?`${poiRows().length} point(s)`:''};
+{let tm=null;const upd=()=>{S.repTitle=$('repT').value.trim();S.repNote=$('repC').value.replace(/\s+$/,'');clearTimeout(tm);tm=setTimeout(()=>{repPreview();sessSchedule()},500)};$('repT').oninput=upd;$('repC').oninput=upd}
 $('repClose').onclick=()=>{$('repSheet').hidden=true};
 /* ---------- Calibration de site (localisation) Emlid Flow 360 : texte copié des pages « Informations sur le système de coordonnées » et « Points de localisation » ---------- */
 function calParse(txt){
@@ -2978,19 +2999,19 @@ $('calApply').onclick=()=>{const t=$('calText').value;const c=calParse(t);if(!c.
   c.raw=t;c.t=new Date().toLocaleString('fr-CA');S.calib=c;const k=calKey(c.cs||calCsName());if(k){const m=LS.get('vl.calib',{});m[k]=c;LS.set('vl.calib',m)}
   const cs=calKey(calCsName());if(c.cs&&cs&&calKey(c.cs)!==cs)toast(`Attention : calibration « ${c.cs} », levé en « ${calCsName()} ».`);else toast(`Calibration de site associée : ${c.pairs.length} paire(s).`);
   S.journal.push({name:'Calibration',before:'',after:c.cs||'',why:`Calibration de site Emlid jointe au rapport (${c.pairs.length} paires)`,t:c.t});
-  $('calSheet').hidden=true;calNote();$('repFrame').srcdoc=reportHTML();sessSchedule()};
-$('calClear').onclick=()=>{const c=calCurrent();S.calib=null;if(c){const m=LS.get('vl.calib',{});delete m[calKey(c.cs||calCsName())];LS.set('vl.calib',m)}$('calText').value='';$('calPrev').innerHTML='';calNote();$('repFrame').srcdoc=reportHTML();toast('Calibration retirée.')};
+  $('calSheet').hidden=true;calNote();repPreview();sessSchedule()};
+$('calClear').onclick=()=>{const c=calCurrent();S.calib=null;if(c){const m=LS.get('vl.calib',{});delete m[calKey(c.cs||calCsName())];LS.set('vl.calib',m)}$('calText').value='';$('calPrev').innerHTML='';calNote();repPreview();toast('Calibration retirée.')};
 /* ---------- Photos du terrain (rapport) : réduites à 1600 px, gardées dans la séance ---------- */
 S.photos=S.photos||[];
 function phRefresh(){const L=S.photos;$('phN').textContent=L.length?`${L.length} photo(s) au rapport`:'aucune photo';
   $('phList').innerHTML=L.map((p,k)=>`<div style="width:150px;font-size:12px"><img src="${p.url}" alt="" style="width:150px;height:72px;object-fit:cover;border-radius:4px;border:1px solid var(--line)"><input data-k="${k}" class="phCap" value="${esc(p.cap||'')}" placeholder="légende" style="width:100%;font-size:12px"><select data-k="${k}" class="phSz" title="Taille de la photo au rapport" style="width:100%;font-size:12px;margin-top:2px">${[['s','Petite'],['m','Moyenne'],['l','Pleine largeur']].map(([v,l])=>`<option value="${v}" ${(p.size||'s')===v?'selected':''}>${l}</option>`).join('')}</select><button class="btn sm phDel" data-k="${k}" type="button" style="margin-top:2px">Retirer</button></div>`).join('');
-  $('phList').querySelectorAll('.phCap').forEach(x=>x.onchange=()=>{S.photos[+x.dataset.k].cap=x.value;$('repFrame').srcdoc=reportHTML();sessSchedule()});
-  $('phList').querySelectorAll('.phSz').forEach(x=>x.onchange=()=>{S.photos[+x.dataset.k].size=x.value;$('repFrame').srcdoc=reportHTML();sessSchedule()});
-  $('phList').querySelectorAll('.phDel').forEach(x=>x.onclick=()=>{S.photos.splice(+x.dataset.k,1);phRefresh();$('repFrame').srcdoc=reportHTML();sessSchedule()})}
+  $('phList').querySelectorAll('.phCap').forEach(x=>x.onchange=()=>{S.photos[+x.dataset.k].cap=x.value;repPreview();sessSchedule()});
+  $('phList').querySelectorAll('.phSz').forEach(x=>x.onchange=()=>{S.photos[+x.dataset.k].size=x.value;repPreview();sessSchedule()});
+  $('phList').querySelectorAll('.phDel').forEach(x=>x.onclick=()=>{S.photos.splice(+x.dataset.k,1);phRefresh();repPreview();sessSchedule()})}
 $('phIn').onchange=async e=>{const fs=[...e.target.files];e.target.value='';let n=0;
   for(const f of fs){try{const bm=await createImageBitmap(f);const k=Math.min(1,1600/Math.max(bm.width,bm.height));const c=document.createElement('canvas');c.width=Math.round(bm.width*k);c.height=Math.round(bm.height*k);c.getContext('2d').drawImage(bm,0,0,c.width,c.height);
     S.photos.push({url:c.toDataURL('image/jpeg',.82),cap:f.name.replace(/\.[^.]+$/,''),t:new Date(f.lastModified||Date.now()).toLocaleString('fr-CA'),name:f.name});n++}catch(err){toast(`${f.name} : image non lisible.`)}}
-  phRefresh();$('repFrame').srcdoc=reportHTML();if(n)toast(`${n} photo(s) ajoutée(s) au rapport.`);if(n&&S.hist)sessFileSave&&sessFileSave()};
+  phRefresh();repPreview();if(n)toast(`${n} photo(s) ajoutée(s) au rapport.`);if(n&&S.hist)sessFileSave&&sessFileSave()};
 function repPhotoSec(e,sec){const L=S.photos||[];if(!L.length)return '';
   return sec('Photos du terrain',`<div class="phg" style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px">${L.map((p,k)=>`<figure style="margin:0;break-inside:avoid;grid-column:span ${({s:2,m:3,l:6})[p.size||'s']}"><img src="${p.url}" alt="${e(p.cap||'')}" style="width:100%;border:1px solid #d5dde1;border-radius:4px"><figcaption class="note"><b>Photo ${k+1}</b>${p.cap?' — '+e(p.cap):''}${p.t?` · ${e(p.t)}`:''}</figcaption></figure>`).join('')}</div>`)}
 $('repSave').onclick=()=>{const f=repFile();save(f.name,f.data)};
@@ -3090,7 +3111,8 @@ function reportHTML(){
   const bad=gnss.filter(r=>{const s=M(r,'Solution status');const h=num(M(r,'Lateral RMS')),v=num(M(r,'Elevation RMS'));return (s&&s!=='FIX')||(h!=null&&h>tolH)||(v!=null&&v>tolV)});
   const descOf=r=>e(r.desc);
   S.repSecs=[];const hideS=new Set(S.repHide||[]);
-  const sec=(t,body)=>{const k=String(t).replace(/<[^>]+>/g,'').replace(/&#39;/g,"'");S.repSecs.push(k);return hideS.has(k)?'':`<section><h2>${t}</h2>${body}</section>`};
+  const sec=(t,body)=>{const k=String(t).replace(/<[^>]+>/g,'').replace(/&#39;/g,"'");S.repSecs.push(k);const pv=S.repPreview?` data-sec="${esc(k)}"`:'';
+    return hideS.has(k)?(S.repPreview?`<section class="off"${pv}><h2>${t}</h2></section>`:''):`<section${pv}><h2>${t}</h2>${body}</section>`};
   const tbl=(head,trs,cls='')=>trs.length?`<table class="${cls}"><thead><tr>${head.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${trs.join('')}</tbody></table>`:'<p class="na">Aucun.</p>';
   const gen=new Date().toLocaleString('fr-CA');
   const tb=S.F&&S.F.trimble,ti=tb?tb.info:{};
