@@ -25,7 +25,7 @@
    - **HAUT. ANT.** (hauteur d'antenne / prisme), **NUMÉROTER** (standard ArpentNord), effacer / rétablir un point (fiche du point).
    - **Annuler**, **Historique** (annuler une correction précise).
 6. **ANALYSE** (facultatif) : analyse d'un fossé entre deux points (eau accumulée, débordement, sens et pente d'écoulement) → « Ajouter au rapport ».
-7. **Fond** (facultatif) : orthophoto du projet (image + fichier de référence) ou imagerie en ligne.
+7. **Fond** (facultatif) : orthophoto du projet (image + fichier de référence), **dossier de tuiles** (orthos lourdes découpées par `DECOUPER_ORTHOS.bat` : l'app charge seule les tuiles autour du levé, l'ortho la plus récente à égalité ; ajout des tuiles de la vue ou d'une tuile autour ; dossier retenu sur l'appareil) ou imagerie en ligne.
 8. **Rapport** : **Points d'intérêt…** (points choisis par code ou sur le plan, étiquettes et symboles, point de référence avec désignation et symbole, distances cochées entre les points (1–2, 1–3…), autres cotes entre deux points ou d'un point à une ligne de deux points ; symboles des bibliothèques publiques Temaki et Maki (CC0) ; section en tête du rapport avec vue, coordonnées et distances ; exports CSV et DXF de ces points), **sections affichées / cachées** (case devant chaque titre dans l'aperçu ; préréglages « Rapport client » / « Rapport complet »), titre et commentaires modifiables (repris au début du rapport et gardés dans la séance), aperçu, **calibration de site Emlid** (coller le texte des pages Flow 360 « Informations sur le système de coordonnées » et « Points de localisation »), ajout de photos du terrain (légende et taille au rapport pour chacune : petite, moyenne, pleine largeur), « Enregistrer _rapport.html » ou « Imprimer / PDF ».
 9. **Exporter _modif.txt** et **Exporter DXF** ; **Envoyer par Outlook…** au besoin.
 10. **Sauvegarder la séance** pour reprendre plus tard (ou sur un autre poste) : le fichier `_seance.json` se rouvre avec « Ouvrir un levé… ». Une sauvegarde automatique est aussi gardée dans le navigateur (5 derniers levés).
@@ -118,6 +118,7 @@ Un guide illustré est disponible : `guide.html` (bouton Documentation de la Bo�
 | v9.15 | 2026-11-18 | Photos du rapport : taille choisie pour chaque photo (petite, moyenne, pleine largeur) |
 | v9.16 | 2026-11-19 | Points d'intérêt au rapport (vue centrée numérotée, distances choisies entre les points, cotes point–ligne, point de référence avec désignation et symbole, symboles libres CC0 Temaki/Maki, coordonnées, exports CSV/DXF) ; sections du rapport affichées/cachées, préréglage « Rapport client » |
 | v9.17 | 2026-11-19 | Fond d'ortho / imagerie sous la vue des points d'intérêt ; secteur marqué (cercle rouge, étoile) sur la vue générale ; case devant chaque titre de l'aperçu pour afficher / cacher la section |
+| v9.18 | 2026-11-19 | Fond → « Dossier de tuiles » : index des tuiles (INDEX_TUILES.csv ou .jgw), choix automatique de l'ortho qui couvre le levé, chargement des seules tuiles utiles ; « Charger les tuiles de la vue », « Une tuile de plus autour », choix d'une autre ortho, aperçu complet ; contour des tuiles non chargées (plan seulement) ; dossier retenu (Chrome / Edge) |
 
 ## 9. Responsables
 
