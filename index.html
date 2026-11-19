@@ -356,7 +356,7 @@ tr.hion td{background:color-mix(in srgb,#ffc440 18%,transparent)}
             <code>_</code><span>Liaison multiple sur un même point : <code>526 1.2_2.1</code> ferme le string 1 et débute le string 2 ; <code>181 1_186 1.1</code> continue le 181 et débute le 186 (double Pcode). Autant de liaisons que voulu.</span>
           </div>
           <p class="note">Format lu&nbsp;: <code>Matricule,Est,Nord,Élév,Description</code> où la description est <code>Pcode String.Contrôle [attributs]</code>, ex. <code>526 1.1</code>. Le fichier _modif est toujours écrit au format <code>P,N,E,Z,D</code> (Point, Nord, Est, Élév., Description), sans ligne d'en-tête, quel que soit le format lu. Il contient les descriptions corrigées, les coordonnées des points inversés et les points calculés (rectangle), insérés juste après le dernier point de leur ligne.</p>
-          <p class="note">Version v9.17-2026-11-19 · fonctionne hors ligne une fois ouverte · les fichiers restent sur l'appareil.</p>
+          <p class="note">Version v9.18-2026-11-19 · fonctionne hors ligne une fois ouverte · les fichiers restent sur l'appareil.</p>
           <div class="actions"><button class="btn sm" id="bJournal" type="button" disabled>Exporter le journal des corrections (.csv)</button><button class="btn sm" id="bResetLay" type="button">Rétablir les couches du gabarit</button></div>
         </div>
       </div>
@@ -501,6 +501,12 @@ tr.hion td{background:color-mix(in srgb,#ffc440 18%,transparent)}
       <label><input type="radio" name="bgSrc" value="esri"> Imagerie en ligne — Esri World Imagery <span class="note">(dépannage, précision ± 1 m)</span></label>
       <label><input type="radio" name="bgSrc" value="custom"> Service personnalisé (modèle d'URL {z}/{x}/{y})</label>
     </fieldset>
+    <div id="tdBox" style="border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:8px 0;display:grid;gap:6px">
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px"><b style="min-width:11.5em">Dossier de tuiles</b><button class="btn primary sm" id="tdPick" type="button">Choisir le dossier de tuiles…</button><button class="btn sm" id="tdRe" type="button" hidden></button><input type="file" id="tdIn" webkitdirectory multiple hidden><span class="note mono" id="tdN">aucun</span></div>
+      <p class="note" style="margin:0">Choisissez le dossier <b>_APP</b> créé par DECOUPER_ORTHOS.bat (ou un dossier d'orthos légères avec leurs .jgw). L'app retient l'ortho qui couvre le levé (la plus récente à égalité) et charge seulement les tuiles autour des points ; le dossier est retenu pour les prochains levés.</p>
+      <div id="tdList" style="display:grid;gap:4px"></div>
+      <div class="actions" style="margin:0"><button class="btn sm" id="tdView" type="button" hidden>Charger les tuiles de la vue</button><button class="btn sm" id="tdGrow" type="button" hidden>Une tuile de plus autour</button><button class="btn sm" id="tdAutoB" type="button" hidden>Recharger pour ce levé</button><label class="note"><input type="checkbox" id="tdLine" checked> contour des tuiles non chargées</label></div>
+    </div>
     <div id="bgPick" style="border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:8px 0;display:grid;gap:8px">
       <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px"><b style="min-width:11.5em">1. Image de l'ortho</b><label class="btn sm filebtn">Choisir l'image…<input type="file" id="bgImgIn" accept=".jpg,.jpeg,.png,.tif,.tiff"></label><span class="note mono" id="bgImgN">aucune</span></div>
       <div style="display:flex;flex-wrap:wrap;align-items:center;gap:8px"><b style="min-width:11.5em">2. Fichier de référence</b><label class="btn sm filebtn">Choisir le fichier de référence…<input type="file" id="bgRefIn" multiple accept=".jgw,.pgw,.tfw,.wld,.jpgw,.pngw,.tifw,.xml,.prj"></label><span class="note mono" id="bgRefN">aucun</span></div>
@@ -1423,6 +1429,7 @@ function load(text,name){
   toast(`${name} chargé${F.fmt?' (format '+F.fmt+')':''} : ${F.rows.length} points${nRen?` · ${nRen} point(s) à nom non numérique renuméroté(s)`:''}.`);
   if(S.issues.some(i=>i.kind==='codemap'))setTimeout(()=>cmOpen(true),0);
   if(!S.restoring){const old=sessList().find(x=>x.key===S.sessKey);if(old)sessOffer([old],true)}
+  if(TD.idx.length)setTimeout(()=>tdAuto(true),60);
   return true;
 }
 function decodeBytes(buf){const u8=new Uint8Array(buf);S.nextEnc='windows-1252';if(u8.length>=3&&u8[0]===0xEF&&u8[1]===0xBB&&u8[2]===0xBF)S.nextEnc='utf-8';else if(!u8.some(c=>c>127))S.nextEnc='windows-1252';else{try{new TextDecoder('utf-8',{fatal:true}).decode(u8);S.nextEnc='utf-8'}catch(e){}}
@@ -2817,7 +2824,7 @@ function niceStep(px){const m=px/S.view.k;const p=Math.pow(10,Math.floor(Math.lo
 function draw(){
   if(!S.W)return;const css=getComputedStyle(document.documentElement);
   ctx.fillStyle=css.getPropertyValue('--plan').trim()||'#0b0f12';ctx.fillRect(0,0,S.W,S.H);
-  if(S.view&&S.rows.length)try{drawBg()}catch(e){console.error(e)}
+  if(S.view&&S.rows.length){try{drawBg()}catch(e){console.error(e)}try{tdDraw()}catch(e){}}
   if(!S.view||!S.rows.length){ctx.fillStyle='#8b9aa3';ctx.font='15px Barlow, sans-serif';ctx.textAlign='center';if(S.W<560){ctx.fillText('Touchez « Ouvrir un levé… »',S.W/2,S.H/2-10);ctx.fillText('ou « Coller » pour charger un levé',S.W/2,S.H/2+12);}else ctx.fillText('Glissez un fichier de levé ici ou utilisez « Ouvrir un levé… »',S.W/2,S.H/2);ctx.textAlign='left';return}
   // grille métrique
   const st=niceStep(70);ctx.strokeStyle=css.getPropertyValue('--plan-grid').trim();ctx.lineWidth=1;ctx.beginPath();
@@ -3513,6 +3520,130 @@ $('bgRefIn').onchange=e=>{BG.pick.ref=[...e.target.files];e.target.value='';bgPi
 $('bgGo').onclick=async()=>{const p=BG.pick;if(!p.img)return;if(!p.ref.length){toast('Choisissez aussi le fichier de référence (.jgw ou .aux.xml) de l\'image.');return}
   $('bgGo').disabled=true;$('bgGo').textContent='Ouverture…';const n=await bgOpenFiles([p.img,...p.ref],p.img);$('bgGo').textContent='Ouvrir l\'ortho';if(n){BG.pick={img:null,ref:[]}}bgPickUi()};
 bgSync();
+
+/* ---------- Dossier de tuiles (orthos découpées par DECOUPER_ORTHOS.bat) ----------
+   On choisit une fois le dossier (_APP ou le dossier des orthos) ; l'app indexe les tuiles (INDEX_TUILES.csv,
+   sinon les .jgw + en-têtes), retient l'ortho qui couvre le levé (la plus récente à égalité) et charge seulement
+   les tuiles autour des points. On peut ajouter les tuiles de la vue, élargir d'une tuile, ou cocher une autre ortho.
+   Le dossier est retenu sur l'appareil (Chrome / Edge) ; ailleurs, on le rechoisit (sélection de dossier). */
+const TD={h:null,name:'',idx:[],on:new Set(),line:LS.get('vl.tdLine',true),busy:false,need:false};
+const tdIdb=(mode,fn)=>wdIdb(mode,fn);
+const tdDate=s=>{const m=String(s).match(/(?:^|[_\- ])(\d{6})(?=[_\- .]|$)/g);if(!m)return '';const d=m[m.length-1].replace(/\D/g,'');return d};
+const tdDateTxt=d=>d?`20${d.slice(0,2)}-${d.slice(2,4)}-${d.slice(4,6)}`:'';
+async function tdHead(f){// dimensions sans lire tout le fichier
+  try{const b=new Uint8Array(await f.slice(0,Math.min(f.size,262144)).arrayBuffer());
+    if(b[0]===0x89&&b[1]===0x50)return {w:(b[16]<<24|b[17]<<16|b[18]<<8|b[19])>>>0,h:(b[20]<<24|b[21]<<16|b[22]<<8|b[23])>>>0};
+    if(b[0]===0xFF&&b[1]===0xD8){let i=2;while(i+9<b.length){if(b[i]!==0xFF){i++;continue}const m=b[i+1];if(m===0xFF){i++;continue}if(m===0xD8||m===0x01||m===0x00||(m>=0xD0&&m<=0xD7)){i+=2;continue}const L=b[i+2]<<8|b[i+3];
+      if((m>=0xC0&&m<=0xC3)||(m>=0xC5&&m<=0xC7)||(m>=0xC9&&m<=0xCB)||(m>=0xCD&&m<=0xCF))return {h:b[i+5]<<8|b[i+6],w:b[i+7]<<8|b[i+8]};i+=2+L}}}catch(e){}
+  const d=await bgDims(f);return d&&d.w?d:null}
+const tdWf=async f=>{const v=(await f.text()).replace(/,/g,'.').split(/\s+/).filter(Boolean).map(Number);return v.length>=6&&v.slice(0,6).every(isFinite)?v.slice(0,6):null};
+/* Liste des fichiers : [{p:'chemin/relatif', get:()=>Promise<File>}] */
+async function tdWalk(h,pre,out,deep){for await(const [n,x] of h.entries()){if(n.startsWith('.'))continue;const p=pre?pre+'/'+n:n;
+    if(x.kind==='directory'){if(deep<8&&!/^(processing|temp|logs|configs)$/i.test(n))await tdWalk(x,p,out,deep+1)}else if(/\.(jpe?g|png|jgw|pgw|wld|jpgw|pngw|csv)$/i.test(n))out.push({p,get:()=>x.getFile()})}return out}
+async function tdIndex(list){
+  const by=new Map(list.map(x=>[x.p.toLowerCase(),x]));const idx=[];const seen=new Set();
+  const base=p=>p.replace(/\.[^./]+$/,'');
+  // 1) INDEX_TUILES.csv (écrit par DECOUPER_ORTHOS.bat) : rapide, aucune image à ouvrir
+  for(const c of list.filter(x=>/(^|\/)INDEX_TUILES\.csv$/i.test(x.p)).sort((a,b)=>a.p.length-b.p.length)){
+    const dir=c.p.replace(/[^/]*$/,'');let txt='';try{txt=await (await c.get()).text()}catch(e){continue}
+    for(const l of txt.replace(/^﻿/,'').split(/\r?\n/).slice(1)){const v=l.split(';');if(v.length<6)continue;
+      const rel=(dir+v[1].replace(/\\/g,'/')).toLowerCase();const im=by.get(rel),wf=by.get(base(rel)+'.jgw');if(!im||seen.has(rel))continue;
+      const [e0,n0,e1,n1]=v.slice(2,6).map(Number);if(![e0,n0,e1,n1].every(isFinite))continue;
+      seen.add(rel);idx.push({p:im.p,o:v[0],e0,n0,e1,n1,im,wf,ap:false})}}
+  // 2) autres images calées (aperçus, dossiers sans index) : .jgw + en-tête
+  const imgs=list.filter(x=>/\.(jpe?g|png)$/i.test(x.p)&&!seen.has(x.p.toLowerCase()));
+  if(imgs.length>4000)toast(`${imgs.length} images dans ce dossier : choisissez plutôt le dossier _APP créé par DECOUPER_ORTHOS.bat.`);
+  let k=0;for(const im of imgs.slice(0,4000)){const b=base(im.p).toLowerCase();const wf=by.get(b+'.jgw')||by.get(b+'.pgw')||by.get(b+'.wld')||by.get(b+'.jpgw')||by.get(b+'.pngw');if(!wf)continue;
+    try{const w=await tdWf(await wf.get());if(!w||w[1]||w[2])continue;const f=await im.get();const d=await tdHead(f);if(!d)continue;
+      const e0=w[4]-w[0]/2,n1=w[5]-w[3]/2,e1=e0+w[0]*d.w,n0=n1+w[3]*d.h;const ap=/_apercu_\d+cm\.(jpe?g|png)$/i.test(im.p);
+      const parts=im.p.split('/');const o=ap?parts[parts.length-1].replace(/_apercu_\d+cm\.[^.]+$/i,''):(/^E\d+_N\d+\./i.test(parts[parts.length-1])&&parts.length>1?parts[parts.length-2]:parts[parts.length-1].replace(/\.[^.]+$/,''));
+      idx.push({p:im.p,o,e0:Math.min(e0,e1),n0:Math.min(n0,n1),e1:Math.max(e0,e1),n1:Math.max(n0,n1),im,wf,ap,big:d.w*d.h>40e6})}catch(e){}
+    if(++k%200===0)tdStat(`Lecture du dossier… ${k} / ${imgs.length} images`)}
+  idx.forEach(t=>t.d=tdDate(t.o));return idx}
+function tdPts(){return S.rows.filter(r=>!r.bad&&!r.del&&isFinite(r.e)&&isFinite(r.n)&&!(r.e===0&&r.n===0))}
+const tdNear=(t,pts,m)=>pts.some(r=>r.e>=t.e0-m&&r.e<=t.e1+m&&r.n>=t.n0-m&&r.n<=t.n1+m);
+const tdIn=(t,r)=>r.e>=t.e0&&r.e<=t.e1&&r.n>=t.n0&&r.n<=t.n1;
+function tdOrthos(){const m=new Map();for(const t of TD.idx){if(!m.has(t.o))m.set(t.o,{o:t.o,d:t.d,tiles:[],ap:null});const g=m.get(t.o);if(t.ap)g.ap=t;else if(!t.big)g.tiles.push(t)}return [...m.values()]}
+const tdLoaded=()=>BG.orthos.filter(o=>o.td);
+/* Choix automatique : l'ortho qui couvre le plus de points (la plus récente à égalité), puis une 2e si des points restent hors tuiles */
+function tdPick(){const pts=tdPts();const G=tdOrthos().filter(g=>g.tiles.length);const on=new Set();let rest=pts.slice();
+  while(rest.length&&on.size<4){let best=null,bc=0;for(const g of G){if(on.has(g.o))continue;const c=rest.filter(r=>g.tiles.some(t=>tdIn(t,r))).length;if(c>bc||(c===bc&&c>0&&best&&g.d>best.d)){best=g;bc=c}}
+    if(!best||!bc)break;on.add(best.o);rest=rest.filter(r=>!best.tiles.some(t=>tdIn(t,r)))}
+  return on}
+async function tdLoad(list,why){list=list.filter(t=>!BG.orthos.some(o=>o.td===t.p));if(!list.length){tdUi();return 0}
+  const n0=tdLoaded().length,tot=n0+list.length;let n=0;const errs=[];
+  for(const t of list){tdStat(`Chargement des tuiles… ${n+1} / ${list.length}`);
+    try{const f=await t.im.get();const w=await tdWf(await t.wf.get());const d=await tdHead(f);if(!w||!d)throw new Error('calage');
+      // budget mémoire : pleine résolution jusqu'à 6 tuiles, réduite au-delà (≈ 150 Mpx au total)
+      let sc=Math.min(1,Math.sqrt(150e6/Math.max(1,tot*d.w*d.h)),8192/Math.max(d.w,d.h));if(t.big)sc=Math.min(sc,Math.sqrt(40e6/(d.w*d.h)));
+      const img=sc<.999?await createImageBitmap(f,{resizeWidth:Math.max(1,Math.round(d.w*sc)),resizeHeight:Math.max(1,Math.round(d.h*sc)),resizeQuality:'medium'}):await createImageBitmap(f);
+      let [A,D,B,E,C,F]=w;const fx=d.w/img.width,fy=d.h/img.height;if(fx!==1||fy!==1){const C0=C-A/2-B/2,F0=F-D/2-E/2;A*=fx;D*=fx;B*=fy;E*=fy;C=C0+A/2+B/2;F=F0+D/2+E/2}
+      const o={name:t.p,img,w:img.width,h:img.height,A,B,C,D,E,F,hit:true,td:t.p,tdo:t.o,ap:t.ap};
+      if(t.ap)BG.orthos.unshift(o);else BG.orthos.push(o);n++;if(n%2===0)draw()}catch(e){errs.push(t.p.split('/').pop())}}
+  // au-delà de 40 tuiles, on libère les plus anciennes hors de la vue
+  const L=tdLoaded().filter(o=>!o.ap);if(L.length>40){const [x0,y1]=S2W(0,0),[x1,y0]=S2W(S.W,S.H);for(const o of L.slice(0,L.length-40)){const e=o.C,nn=o.F;if(e>x1||e<x0-400||nn<y0||nn>y1+400){try{o.img.close&&o.img.close()}catch(er){}BG.orthos.splice(BG.orthos.indexOf(o),1)}}}
+  if(n){BG.src='ortho';bgSave()}bgSync();draw();tdUi();
+  if(why!==false)toast(`${n} tuile(s) chargée(s)${why?' '+why:''}${errs.length?` · illisible(s) : ${errs.slice(0,3).join(', ')}`:''}.`);return n}
+function tdUnload(pred){for(const o of tdLoaded().filter(pred)){try{o.img.close&&o.img.close()}catch(e){}BG.orthos.splice(BG.orthos.indexOf(o),1)}bgSync();draw();tdUi()}
+async function tdAuto(quiet){if(!TD.idx.length||!S.rows.length)return;const pts=tdPts();if(!pts.length)return;
+  tdUnload(o=>true);TD.on=tdPick();
+  let list=TD.idx.filter(t=>!t.ap&&TD.on.has(t.o)&&tdNear(t,pts,25));
+  if(list.length>24){list=TD.idx.filter(t=>!t.ap&&TD.on.has(t.o)&&pts.some(r=>tdIn(t,r)))}
+  if(!list.length){// pas de tuile : aperçu (ou ortho entière légère) qui couvre le levé
+    const ap=TD.idx.filter(t=>t.ap&&pts.some(r=>tdIn(t,r))).sort((a,b)=>b.d.localeCompare(a.d))[0]||TD.idx.filter(t=>!t.big&&pts.some(r=>tdIn(t,r))).sort((a,b)=>b.d.localeCompare(a.d))[0];
+    if(ap){TD.on=new Set([ap.o]);await tdLoad([ap],`(aperçu de ${ap.o} : aucune tuile fine sur ce levé)`)}else{tdUi();if(!quiet)toast(`Aucune tuile du dossier ${TD.name} ne couvre ce levé (vérifiez la zone MTM).`)}return}
+  await tdLoad(list,`de ${[...TD.on].join(' + ')}`)}
+async function tdView(){if(!TD.idx.length)return;const [x0,y1]=S2W(0,0),[x1,y0]=S2W(S.W,S.H);
+  const ins=t=>!t.ap&&t.e1>x0&&t.e0<x1&&t.n1>y0&&t.n0<y1;let list=TD.idx.filter(t=>ins(t)&&(!TD.on.size||TD.on.has(t.o)));
+  if(!list.length){// autre ortho : la plus récente pour chaque case
+    const cell=new Map();for(const t of TD.idx.filter(ins)){const k=Math.round(t.e0)+'_'+Math.round(t.n0);const c=cell.get(k);if(!c||t.d>c.d)cell.set(k,t)}list=[...cell.values()];list.forEach(t=>TD.on.add(t.o))}
+  const todo=list.filter(t=>!BG.orthos.some(o=>o.td===t.p));
+  if(todo.length>20){toast(`${todo.length} tuiles dans la vue : rapprochez-vous (20 au plus à la fois).`);return}
+  if(!todo.length){toast(list.length?'Les tuiles de la vue sont déjà chargées.':'Aucune tuile dans la vue.');return}
+  await tdLoad(todo,'(vue actuelle)')}
+async function tdGrow(){const L=tdLoaded().filter(o=>!o.ap);if(!L.length){tdView();return}
+  const have=TD.idx.filter(t=>L.some(o=>o.td===t.p));const m=5;
+  const list=TD.idx.filter(t=>!t.ap&&TD.on.has(t.o)&&!have.includes(t)&&have.some(h=>t.e0<=h.e1+m&&t.e1>=h.e0-m&&t.n0<=h.n1+m&&t.n1>=h.n0-m));
+  if(!list.length){toast('Aucune tuile voisine de plus dans cette ortho.');return}if(list.length>24){toast(`${list.length} tuiles voisines : utilisez plutôt « Charger les tuiles de la vue ».`);return}
+  await tdLoad(list,'(une tuile de plus autour)')}
+function tdStat(m){const s=$('tdN');if(s)s.textContent=m}
+function tdUi(){const box=$('tdList');if(!box)return;const has=TD.idx.length>0;
+  ['tdView','tdGrow','tdAutoB'].forEach(id=>{const b=$(id);if(b)b.hidden=!has});
+  const re=$('tdRe');if(re){re.hidden=!(TD.h&&!has);re.textContent=TD.h?`Rouvrir ${TD.name}`:''}
+  if(!has){box.innerHTML='';tdStat(TD.h?`${TD.name} (à rouvrir)`:'aucun');return}
+  const nT=TD.idx.filter(t=>!t.ap&&!t.big).length,L=tdLoaded();tdStat(`${TD.name} · ${nT} tuile(s), ${tdOrthos().filter(g=>g.tiles.length||g.ap).length} ortho(s) · ${L.filter(o=>!o.ap).length} chargée(s)`);
+  const pts=tdPts();const G=tdOrthos().map(g=>({...g,cov:pts.length?pts.filter(r=>g.tiles.some(t=>tdIn(t,r))||(g.ap&&tdIn(g.ap,r))).length:0}))
+    .filter(g=>g.cov||TD.on.has(g.o)||L.some(o=>o.tdo===g.o)).sort((a,b)=>b.cov-a.cov||b.d.localeCompare(a.d));
+  box.innerHTML=G.length?`<div class="note" style="margin:2px 0">Orthos qui couvrent ce levé :</div>`+G.map(g=>{const n=L.filter(o=>o.tdo===g.o&&!o.ap).length;
+    return `<label style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><input type="checkbox" data-tdo="${esc(g.o)}" ${TD.on.has(g.o)?'checked':''}> <b>${esc(g.o)}</b> <span class="note">${g.d?tdDateTxt(g.d)+' · ':''}${g.cov}/${pts.length} pts couverts · ${n} tuile(s) chargée(s)${g.ap?` · <a href="#" data-tdap="${esc(g.o)}">aperçu complet</a>`:''}</span></label>`}).join(''):
+    `<div class="note">Aucune ortho de ${esc(TD.name)} ne couvre ce levé.</div>`}
+async function tdOpen(list,name,h){if(!list.length){toast('Dossier vide ou sans image.');return}
+  TD.busy=true;tdStat('Lecture du dossier…');try{TD.idx=await tdIndex(list)}finally{TD.busy=false}TD.name=name;TD.h=h||null;
+  if(!TD.idx.length){tdUi();toast(`Aucune ortho calée (.jpg + .jgw) dans ${name}.`);return}
+  tdUi();if(S.rows.length)await tdAuto();else toast(`${name} : ${TD.idx.filter(t=>!t.ap&&!t.big).length} tuile(s) indexée(s) ; elles se chargeront à l'ouverture d'un levé.`)}
+async function tdPerm(h,ask){try{let q=await h.queryPermission({mode:'read'});if(q!=='granted'&&ask)q=await h.requestPermission({mode:'read'});return q==='granted'}catch(e){return false}}
+async function tdFromHandle(h){tdStat('Lecture du dossier…');const list=await tdWalk(h,'',[],0);await tdOpen(list,h.name,h)}
+if($('tdPick')){
+  $('tdPick').onclick=async()=>{if('showDirectoryPicker' in window){try{const h=await showDirectoryPicker({id:'vl-tuiles',mode:'read'});try{await tdIdb('readwrite',st=>st.put(h,'td'))}catch(e){}await tdFromHandle(h)}catch(e){if(e&&e.name!=='AbortError')toast('Lecture du dossier impossible : '+(e.message||e))}}
+    else $('tdIn').click()};
+  $('tdIn').onchange=async e=>{const fs=[...e.target.files];e.target.value='';if(!fs.length)return;const root=(fs[0].webkitRelativePath||'').split('/')[0]||'dossier';
+    const list=fs.filter(f=>/\.(jpe?g|png|jgw|pgw|wld|jpgw|pngw|csv)$/i.test(f.name)).map(f=>({p:(f.webkitRelativePath||f.name).split('/').slice(1).join('/')||f.name,get:async()=>f}));await tdOpen(list,root,null)};
+  $('tdRe').onclick=async()=>{if(TD.h&&await tdPerm(TD.h,true))await tdFromHandle(TD.h);else toast('Accès refusé : rechoisissez le dossier de tuiles.')};
+  $('tdView').onclick=()=>tdView();$('tdGrow').onclick=()=>tdGrow();$('tdAutoB').onclick=()=>tdAuto();
+  $('tdLine').checked=TD.line;$('tdLine').onchange=e=>{TD.line=e.target.checked;LS.set('vl.tdLine',TD.line);draw()};
+  $('tdList').onchange=async e=>{const c=e.target.closest('input[data-tdo]');if(!c)return;const o=c.dataset.tdo;
+    if(c.checked){TD.on.add(o);const pts=tdPts();let list=TD.idx.filter(t=>!t.ap&&t.o===o&&tdNear(t,pts,25));if(list.length>24)list=list.filter(t=>pts.some(r=>tdIn(t,r)));await tdLoad(list,`de ${o}`)}
+    else{TD.on.delete(o);tdUnload(x=>x.tdo===o)}};
+  $('tdList').onclick=async e=>{const a=e.target.closest('a[data-tdap]');if(!a)return;e.preventDefault();const t=TD.idx.find(x=>x.ap&&x.o===a.dataset.tdap);if(t){TD.on.add(t.o);await tdLoad([t],`(aperçu complet de ${t.o})`)}};
+  // dossier retenu : rouvert sans question si l'autorisation tient encore, sinon bouton « Rouvrir »
+  if('showDirectoryPicker' in window)tdIdb('readonly',st=>st.get('td')).then(async h=>{if(!h)return;TD.h=h;TD.name=h.name;if(await tdPerm(h,false))await tdFromHandle(h);else tdUi()}).catch(()=>{});
+  tdUi()}
+/* contour des tuiles disponibles (ortho cochée) dans la vue — plan seulement, jamais dans le rapport */
+function tdDraw(){if(!TD.line||!TD.idx.length||BG.src!=='ortho'||ctx.canvas!==cv)return;const [x0,y1]=S2W(0,0),[x1,y0]=S2W(S.W,S.H);
+  const L=new Set(tdLoaded().map(o=>o.td));const T=TD.idx.filter(t=>!t.ap&&(!TD.on.size||TD.on.has(t.o))&&!L.has(t.p)&&t.e1>x0&&t.e0<x1&&t.n1>y0&&t.n0<y1);if(!T.length||T.length>400)return;
+  ctx.save();ctx.setLineDash([6,5]);ctx.strokeStyle='rgba(245,165,36,.75)';ctx.lineWidth=1;ctx.fillStyle='rgba(245,165,36,.9)';ctx.font='10px sans-serif';
+  for(const t of T){const [a,b]=W2S(t.e0+ +BG.dE,t.n1+ +BG.dN),[c,d]=W2S(t.e1+ +BG.dE,t.n0+ +BG.dN);ctx.strokeRect(a,b,c-a,d-b);if(c-a>90)ctx.fillText('tuile non chargée',a+4,d-4)}
+  ctx.restore()}
 
 /* ---------- Codes hors standard → liste ArpentNord (bouton CODES) ----------
    Regroupe les codes du levé qui ne suivent pas « Pcode String.Contrôle », propose des codes de la liste,
